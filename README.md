@@ -1,3 +1,3 @@
-# lmAGI local model Augmented Generative Intelligence
+# language model Augmented Generative Intelligence
 
 ![lmAGI](./gfx/llamagi.jpg)
