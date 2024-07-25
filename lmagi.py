@@ -1,9 +1,12 @@
-# lmagi.py multi-model LLM with automind reasoning from premise to draw_conclusion
+# lmagi.py ollama integration
 # lmagi (c) Gregory L. Magnusson MIT license 2024
+# easyAGI (c) Gregory L. Magnusson MIT license 2024
+# easy augmented generative intelligence UIUX
+# multi-model LLM with automind reasoning from premise to draw_conclusion
 # conversation from main_loop(self) is saved to ./memory/stm/timestampmemory.json from memory.py creating short term memory store of input response
 # reasoning_loop(self)conversation from internal_conclusions are saved in ./memory/logs/thoughts.json
 # lmagi ollama integration v1
-# easy augmented generative intelligence UIUX
+
 
 from nicegui import ui, app  # handle UIUX
 from fastapi.staticfiles import StaticFiles  # integrate fastapi static folder and gfx folder
@@ -24,6 +27,16 @@ app.mount('/gfx', StaticFiles(directory='gfx'), name='gfx')
 
 openmind = OpenMind()  # initialize OpenMind instance
 ollama_model = OllamaHandler()  # initialize OllamaHandler instance
+
+# Toggle for autonomous reasoning
+async def toggle_autonomous_reasoning(value):
+    openmind.autonomous_reasoning = value
+    if value:
+        openmind.reasoning_task = asyncio.create_task(openmind.main_loop())
+    else:
+        if openmind.reasoning_task:
+            openmind.reasoning_task.cancel()
+            openmind.reasoning_task = None
 
 @ui.page('/')
 def main():
@@ -67,7 +80,7 @@ def main():
         # update log button styles based on dark mode
         for button in log_buttons:
             button.classes(remove='light-log-buttons' if dark_mode.value else 'dark-log-buttons')
-            button.classes(add='dark-log-buttons' if dark-mode.value else 'light-log-buttons')
+            button.classes(add='dark-log-buttons' if dark_mode.value else 'light-log-buttons')
 
     # create a row for the dark mode toggle button and FAB buttons
     with ui.row().classes('justify-between w-full p-4'):
@@ -80,6 +93,7 @@ def main():
                         ui.element('q-fab-action').props(f'icon=label color=green-5 label="{service}"').on('click', lambda: select_api(service))
                     create_fab_action(service)
         dark_mode_toggle = ui.button('Dark Mode', on_click=toggle_dark_mode).classes('light-mode-toggle')
+        ui.switch('Autonomous Reasoning', on_change=toggle_autonomous_reasoning).props('checked=False')
 
     # define log files and their paths
     log_files = {
@@ -98,12 +112,12 @@ def main():
         with log_container:
             ui.markdown(log_content).classes('w-full')  # Display log content
 
-    # create tabs menu for chat, logs, API keys, and lmagi
+    # create tabs menu for chat, logs, API keys, and admin
     with ui.tabs().classes('w-full') as tabs:
         chat_tab = ui.tab('chat').classes('tab-style')
         logs_tab = ui.tab('logs').classes('tab-style')
         api_tab = ui.tab('APIk').classes('tab-style')
-        lmagi_tab = ui.tab('lmagi').classes('tab-style').on('click', lambda: ui.open('/ollama'))
+        admin_tab = ui.tab('lmagi').classes('tab-style').on('click', lambda: ui.open('/ollama'))
 
     # create tab panels for the tabs
     with ui.tab_panels(tabs, value=chat_tab).props('style="background-color: rgba(255, 255, 255, 0.5);"').classes('response-style'):
@@ -185,6 +199,7 @@ def ollama_page():
                     "stream": True
                 }
                 logging.debug(f"Sending payload: {payload}")
+
                 async with session.post(ollama_model.api_url + "/generate", json=payload) as response:
                     async for line in response.content:
                         if line:
@@ -192,25 +207,31 @@ def ollama_page():
                             if "response" in data:
                                 response_content += data["response"]
                                 response_output_ollama.set_text(response_content)
+                                logging.debug(f"Received response chunk: {data['response']}")
                             elif "error" in data:
                                 logging.error(f"Error in response: {data['error']}")
                                 ui.notify(f"Error: {data['error']}", type='negative')
+
                 logging.info("Generated response successfully.")
+                logging.debug(f"Complete response content: {response_content}")
+
+                await openmind.send_message(prompt)  # Send the prompt to OpenMind
+                await openmind.internal_queue.put(prompt)  # Add prompt to the internal queue for processing
+                logging.debug(f"Sent prompt to OpenMind: {prompt}")
+
+                await openmind.send_message(response_content)  # Send the response to OpenMind
+                await openmind.internal_queue.put(response_content)  # Add response to the internal queue for processing
+                logging.debug(f"Sent response to OpenMind: {response_content}")
+
         except Exception as e:
             logging.error(f"Error generating response: {e}")
             ui.notify(f"Error generating response: {e}", type='negative')
-
-        await openmind.send_message(prompt)  # Send the prompt to OpenMind
-        await openmind.internal_queue.put(prompt)  # Add prompt to the internal queue for processing
-        await openmind.send_message(response_content)  # Send the response to OpenMind
-        await openmind.internal_queue.put(response_content)  # Add response to the internal queue for processing
 
     def select_ollama_model(model_name):
         global selected_model
         selected_model = model_name
         ui.notify(f'Selected model: {model_name}', type='info')
         logging.info(f"Selected model: {model_name}")
-        select_api("ollama")
 
     def list_ollama_models():
         try:
@@ -249,6 +270,7 @@ def ollama_page():
         dark_mode_toggle.set_text('Light Mode' if dark_mode.value else 'Dark Mode')  # update button
         dark_mode_toggle.classes(remove='light-mode-toggle' if dark_mode.value else 'dark-mode-toggle')  # class remove for dark-mode / light-mode
         dark_mode_toggle.classes(add='dark-mode-toggle' if dark_mode.value else 'light-mode-toggle')  # dark_mode toggle switch
+
     # create a row for the dark mode toggle button and FAB buttons
     with ui.row().classes('justify-between w-full p-4'):
         with ui.row().classes('items-center'):
@@ -256,6 +278,7 @@ def ollama_page():
                 fab_action_container_ollama = ui.element('div').props('vertical')
                 list_ollama_models()  # Initialize Ollama models on startup
         dark_mode_toggle = ui.button('Dark Mode', on_click=toggle_dark_mode).classes('light-mode-toggle')
+        ui.switch('Autonomous Reasoning', on_change=toggle_autonomous_reasoning).props('checked=False')
 
     # footer as input field and with external markdown link
     with ui.footer().classes('footer'), ui.column().classes('footer'):
