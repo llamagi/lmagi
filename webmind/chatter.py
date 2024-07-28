@@ -1,15 +1,17 @@
 # chatter.py (c) Gregory L. Magnusson MIT license 2024
 # modular file to include input response mechanisms for multi-model environment
-# API name must be openai groq or together from API
+# API name must be openai, groq, or together from API
 # ollama integration is from URL
 
 import openai
 from groq import Groq
 from together import AsyncTogether
+from ai71 import AI71  # Import AI71 library
 import subprocess
 import asyncio
 import logging
 import os
+
 
 class GPT4o:
     def __init__(self, openai_api_key):
@@ -18,21 +20,15 @@ class GPT4o:
         self.current_model = "gpt-4o"  # Default model
 
     def set_model(self, model_name):
-        """
-        Set the current model to the specified model_name.
-        """
         self.current_model = model_name
 
     def get_current_model(self):
-        """
-        Get the name of the current model.
-        """
         return self.current_model
 
     def generate_response(self, knowledge):
         prompt = f"{knowledge}"
         try:
-            response = openai.ChatCompletion.create(
+            response = openai.chatcompletion.create(
                 model=self.current_model,
                 messages=[
                     {"role": "system", "content": ""},
@@ -45,21 +41,41 @@ class GPT4o:
             logging.error(f"openai api error: {e}")
             return "error: unable to generate a response due to an issue with the openai api."
 
+class AI71Model:
+    def __init__(self, ai71_api_key):
+        self.client = AI71(ai71_api_key)
+        self.current_model = "tiiuae/falcon-180B-chat"  # Default model
+
+    def set_model(self, model_name):
+        self.current_model = model_name
+
+    def get_current_model(self):
+        return self.current_model
+
+    def generate_response(self, knowledge):
+        prompt = f"{knowledge}"
+        try:
+            response = self.client.chat.completions.create(
+                model=self.current_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt},
+                ]
+            )
+            return response.choices[0].message.content.lower()
+        except Exception as e:
+            logging.error(f"ai71 api error: {e}")
+            return "error: unable to generate a response due to an issue with the ai71 api."
+
 class GroqModel:
     def __init__(self, groq_api_key):
         self.client = Groq(api_key=groq_api_key)
         self.current_model = "mixtral-8x7b-32768"  # Default model
 
     def set_model(self, model_name):
-        """
-        Set the current model to the specified model_name.
-        """
         self.current_model = model_name
 
     def get_current_model(self):
-        """
-        Get the name of the current model.
-        """
         return self.current_model
 
     def generate_response(self, knowledge):
@@ -79,16 +95,10 @@ class GroqModel:
             return "error: unable to generate a response due to an issue with the groq api."
 
 class OllamaModel:
-    """
-    Class to interact with Llama3 model via the Ollama service.
-    """
     def __init__(self):
         self.api_url = "http://localhost:11434/api"
 
     async def generate_response_async(self, knowledge, model="llama3"):
-        """
-        Generate a response from the Llama3 model based on the given knowledge prompt using streaming.
-        """
         try:
             response_content = ""
             stream = ollama.chat(model=model, messages=[{'role': 'user', 'content': knowledge}], stream=True)
@@ -120,21 +130,12 @@ class TogetherModel:
         self.current_model = "mistralai/Mixtral-8x7B-Instruct-v0.1"  # Default model
 
     def set_model(self, model_name):
-        """
-        Set the current model to the specified model_name.
-        """
         self.current_model = model_name
 
     def get_current_model(self):
-        """
-        Get the name of the current model.
-        """
         return self.current_model
 
     async def generate_response_async(self, knowledge):
-        """
-        Generate a response from the Together AI model based on the given knowledge prompt.
-        """
         messages = [{"role": "user", "content": knowledge}]
         try:
             response = await self.async_client.chat.completions.create(
@@ -147,8 +148,4 @@ class TogetherModel:
             return "error: unable to generate a response due to an issue with the together.ai api."
 
     def generate_response(self, knowledge):
-        """
-        Synchronous wrapper for the asynchronous generate_response_async method.
-        """
         return asyncio.run(self.generate_response_async(knowledge))
-
