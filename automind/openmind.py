@@ -1,3 +1,15 @@
+# openmind.py
+# openmind (c) 2024 Gregory L. Magnusson MIT licence
+# internal reasoning loop for continuous AGI reasoning without user interaction
+# openmind internal reasoning asynchronous task ensuring non-blocking execution and efficient concurrency
+# modular integration of automind reasoning with memory
+# ollama model  handling from ollama_handler.py for input response
+# API handlling from api.py and chatter.py for openai, together.ai, groq.com, ai71.ai
+# log internal reasoning conclusion     ./memory/logs/thoughts.json
+# log not premise                       ./memory/logs/notpremise.json
+# log short term memory input response  ./memory/stm/{timestamp}memory.json 
+
+
 import os
 import time
 from datetime import datetime
@@ -5,7 +17,7 @@ from nicegui import ui  # importing ui for easyAGI
 from memory.memory import create_memory_folders, store_in_stm, save_conversation_memory, save_internal_reasoning, DialogEntry, save_valid_truth
 from webmind.ollama_handler import OllamaHandler  # Import OllamaHandler for modular Ollama interactions
 from automind.automind import FundamentalAGI
-from webmind.chatter import GPT4o, GroqModel, TogetherModel
+from webmind.chatter import GPT4o, GroqModel, TogetherModel, AI71Model
 from webmind.api import APIManager
 import ujson as json
 import asyncio
@@ -134,6 +146,16 @@ class OpenMind:
             else:
                 log_and_notify('Together AI API key not found. Please add the key first.', 'warning', 'negative')
 
+        if model_name == 'ai71' and not model_initialized:
+            ai71_key = self.api_manager.get_api_key('ai71')
+            if ai71_key:
+                chatter = AI71Model(ai71_key)  # ai71
+                self.agi_instance = FundamentalAGI(chatter)
+                log_and_notify('Using AI71 for AGI')
+                model_initialized = True
+            else:
+                log_and_notify('AI71 API key not found. Please add the key first.', 'warning', 'negative')
+
         if not model_initialized:
             log_and_notify(f'Failed to initialize AGI with {model_name}', 'warning', 'negative')
 
@@ -141,6 +163,7 @@ class OpenMind:
         openai_key = self.api_manager.get_api_key('openai')
         groq_key = self.api_manager.get_api_key('groq')
         together_key = self.api_manager.get_api_key('together')
+        ai71_key = self.api_manager.get_api_key('ai71')
         llama_running = self.check_llama_running()
 
         if openai_key:
@@ -164,6 +187,13 @@ class OpenMind:
                 with self.message_container:
                     ui.notify('Using Together AI for ezAGI')
             logging.debug("AGI initialized with Together AI")
+        elif ai71_key:
+            chatter = AI71Model(ai71_key)
+            self.agi_instance = FundamentalAGI(chatter)
+            if self.message_container.client.connected:
+                with self.message_container:
+                    ui.notify('Using AI71 for ezAGI')
+            logging.debug("AGI initialized with AI71")
         elif llama_running:
             # Call ollama_handler to list models when LLaMA is found running
             models = self.ollama_handler.list_models()
@@ -224,8 +254,9 @@ class OpenMind:
                 openai_key = self.api_manager.get_api_key('openai')
                 groq_key = self.api_manager.get_api_key('groq')
                 together_key = self.api_manager.get_api_key('together')
+                ai71_key = self.api_manager.get_api_key('ai71')
                 llama_running = self.check_llama_running()
-                if openai_key or groq_key or together_key or llama_running:
+                if openai_key or groq_key or together_key or ai71_key or llama_running:
                     await self.initialize_agi()
                 else:
                     if not self.initialization_warning_shown:
@@ -384,4 +415,3 @@ class OpenMind:
 
         # Log the entire message for debugging purposes
         logging.debug(f"Received JavaScript response: {msg}")
-
