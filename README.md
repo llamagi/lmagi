@@ -56,8 +56,8 @@ pip<br />
 sudo apt install git
 
 ```bash
-git clone https://github.com/easyGLM/ezAGI/
-cd ezAGI
+git clone https://github.com/llamagi/lmagi/
+cd lmagi
 python3 -m venv agi
 source agi/bin/activate
 pip install -r requirements.txt
