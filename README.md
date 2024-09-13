@@ -8,7 +8,7 @@ ollama integration NOT yet integrated with the reasoning components
 language model Augmented Generative Intelligence<br />
 this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/">easyAGI></a> roadmap to display the reasoning capabilities as log files<br />
 integration with ollama point of departure can be found at <a href="https://github.com/llamagi/lmagi">lmagi</a><br />
-project developments has migrated to <a href="https://github.com/easyAGI/">easyAGI</a><br />
+project developments has migrated to <a href="https://github.com/easyAGI/">easyAGI></a><br />
 
 an exercise in multi-model integration for LLM rational enhancement<br />
 
@@ -39,7 +39,7 @@ noun: intelligence
     the ability to acquire and apply knowledge and skills
 ```
 
-easyAGI
+lmAGI
 an expression of enhanced reasoning for LLM with ./memory/stm and advanced log files with responses to hightlight internal reasoning as working concept of machine reasoning
 
 # requirements
