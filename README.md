@@ -4,9 +4,9 @@ ollama integration NOT yet integrated with the reasoning components
 
 ![lmAGI](./gfx/llamagi.jpg)
 
-# ezAGI
-easy Augmented Generative Intelligence for LLM<br />
-this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/ roadmap to display the reasoning capabilities as log files<br />
+# lmAGI
+language model Augmented Generative Intelligence<br />
+this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/">easyAGI"></a> roadmap to display the reasoning capabilities as log files<br />
 integration with ollama point of departure can be found at <a href="https://github.com/llamagi/lmagi">lmagi</a><br />
 project developments has migrated to <a href="https://github.com/easyAGI/">easyAGI</a><br />
 
