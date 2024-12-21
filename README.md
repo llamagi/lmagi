@@ -88,7 +88,7 @@ to install the requirements
 
 suggested: add groq api key
 select groq api key after adding
-![lmAGI](./gfx/llamagi.jpg)
+![lmAGI](./gfx/addAPIkeygroq.png)
 ![lmAGI](./gfx/llamagi.jpg)
 
 
