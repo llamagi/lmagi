@@ -87,9 +87,9 @@ python3 -m pip install -r requirements.txt
 to install the requirements
 
 suggested: add groq api key
-select groq api key after adding
 ![lmAGI](./gfx/addAPIkeygroq.png)
-![lmAGI](./gfx/llamagi.jpg)
+select groq api key after adding
+![lmAGI](./gfx/selectGROQafteraddingkey.png)
 
 
 
