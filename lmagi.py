@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles  # integrate fastapi static folder a
 from webmind.ollama_handler import OllamaHandler  # Import OllamaHandler for modular Ollama interactions
 from webmind.html_head import add_head_html  # handler for the html head imports and meta tags
 from webmind.navigation import Navigation, SideNav  # Unified navigation system and drawer
+from webmind.settings import SettingsManager  # Settings persistence system
 from automind.openmind import OpenMind  # Importing OpenMind class from openmind.py
 import concurrent.futures
 import ujson as json
@@ -30,6 +31,9 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Serve static graphic files and easystyle.css from the 'gfx' directory
 app.mount('/gfx', StaticFiles(directory='gfx'), name='gfx')
+
+# Initialize settings manager
+settings_manager = SettingsManager()
 
 openmind = OpenMind()  # initialize OpenMind instance
 ollama_model = OllamaHandler()  # initialize OllamaHandler instance
@@ -84,29 +88,82 @@ def main():
     # configure HTML head content from html_head.py external module in the webmind folder
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    
+    # CRITICAL FIX #5: Restore autonomous state BEFORE creating header
+    # Use SettingsManager to restore state synchronously
+    autonomous_state_ref = {'value': settings_manager.get('autonomous_reasoning', False)}
+    openmind.autonomous_reasoning = autonomous_state_ref['value']
+    
+    # Also sync from localStorage if available (for browser-only persistence)
+    async def restore_autonomous_state_before_header():
+        try:
+            stored = await ui.run_javascript('localStorage.getItem("autonomous-reasoning") === "true" || window.restoredAutonomousState === true')
+            if stored:
+                autonomous_state_ref['value'] = True
+                openmind.autonomous_reasoning = True
+                # Sync to SettingsManager
+                settings_manager.set('autonomous_reasoning', True)
+        except:
+            pass
+    
+    # Use immediate timer to restore before header creation
+    ui.timer(0.01, restore_autonomous_state_before_header, once=True)
+    
     drawer = SideNav(current_page='chat').create_drawer()
-    # Create reactive reference for autonomous reasoning state
-    autonomous_state_ref = {'value': openmind.autonomous_reasoning}
 
     async def toggle_dark_mode():
         dark_mode.value = not dark_mode.value  # toggle dark mode value
-        # persist preference
-        await ui.run_javascript(
-            f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
-        )
-        # nothing else needed; CSS responds to body--dark
+        # Persist to both localStorage and SettingsManager
+        await ui.run_javascript(f'''
+            localStorage.setItem('theme', '{'dark' if dark_mode.value else 'light'}');
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }} else {{
+                // Fallback: manually sync body--dark class
+                if (document.body) {{
+                    if ({str(dark_mode.value).lower()}) {{
+                        document.body.classList.add('body--dark');
+                    }} else {{
+                        document.body.classList.remove('body--dark');
+                    }}
+                }}
+            }}
+        ''')
+        # Sync to SettingsManager
+        settings_manager.set('dark_mode', dark_mode.value)
 
     async def init_theme_from_storage():
-        stored = await ui.run_javascript('localStorage.getItem("theme")')
-        if stored == 'dark':
-            dark_mode.value = True
-        elif stored == 'light':
-            dark_mode.value = False
+        # Load from SettingsManager first (server-side persistence)
+        theme_name = settings_manager.get('theme', 'gruvbox')
+        dark_mode_setting = settings_manager.get('dark_mode', True)
+        
+        # Sync to localStorage (browser persistence)
+        await ui.run_javascript(f'''
+            localStorage.setItem('ui-theme', '{theme_name}');
+            localStorage.setItem('theme', '{'dark' if dark_mode_setting else 'light'}');
+        ''')
+        
+        # Set dark_mode value
+        dark_mode.value = dark_mode_setting
+        
+        # CRITICAL FIX #2: Sync with unified theme system after restoring
+        await ui.run_javascript(f'''
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }}
+        ''')
 
     # Wrapper to sync reactive state with openmind.autonomous_reasoning
-    async def autonomous_change_handler(value):
+    async def autonomous_change_handler(e):
+        # Extract value from event object (NiceGUI's ValueChangeEventArguments)
+        value = e.value if hasattr(e, 'value') else e
         autonomous_state_ref['value'] = value
         openmind.autonomous_reasoning = value
+        # Persist to both localStorage and SettingsManager
+        await ui.run_javascript(f'localStorage.setItem("autonomous-reasoning", "{str(value).lower()}")')
+        settings_manager.set('autonomous_reasoning', value)
         await toggle_autonomous_reasoning(value)
 
     # Create unified navigation header
@@ -117,21 +174,30 @@ def main():
         autonomous_state=autonomous_state_ref['value']
     )
 
-    # initialize theme once UI is ready
-    ui.timer(0.1, init_theme_from_storage, once=True)
+    # Initialize theme and autonomous state from storage
+    async def init_settings_from_storage():
+        await init_theme_from_storage()
+        # Restore autonomous reasoning state (already set from SettingsManager, but sync from localStorage too)
+        stored_autonomous = await ui.run_javascript('localStorage.getItem("autonomous-reasoning")')
+        if stored_autonomous == 'true':
+            autonomous_state_ref['value'] = True
+            openmind.autonomous_reasoning = True
+            settings_manager.set('autonomous_reasoning', True)
+            await toggle_autonomous_reasoning(True)
+            # Update switch if it exists
+            await ui.run_javascript('''
+                const switches = document.querySelectorAll("input[type=\'checkbox\']");
+                switches.forEach(sw => {
+                    if (sw.closest(".q-switch") && sw.parentElement.textContent.includes("Autonomous")) {
+                        sw.checked = true;
+                        sw.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                });
+            ''')
+    
+    ui.timer(0.1, init_settings_from_storage, once=True)
 
-    # Model selector FAB (floating action button)
-    with ui.page_sticky(position='top-left', x_offset=20, y_offset=80):
-        with ui.button(icon='psychology').props('fab color=primary'):
-            with ui.menu().props('anchor="bottom left"'):
-                ui.menu_item('Model Selection').props('disable')
-                ui.separator()
-                keys_list = openmind.api_manager.api_keys.items()
-                for service, key in keys_list:
-                    def create_model_menu(service):
-                        with ui.menu_item(clickable=True, on_click=lambda s=service: select_api(s)):
-                            ui.label(service.capitalize()).classes('font-bold')
-                    create_model_menu(service)
+    # Model selector moved to footer menu (removed FAB from content area)
 
     # (tabs removed; logs moved to /logs, API keys moved to /settings)
 
@@ -146,6 +212,17 @@ def main():
             ui.label('>').classes('terminal-prefix')
             text = ui.textarea(placeholder='Type your prompt, press Enter to send...').props('rows=1 autogrow').classes('prompt-input')
             ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
+            # API model selector button with dropdown menu
+            with ui.button(icon='psychology').props('round flat').classes('q-ml-sm'):
+                with ui.menu().props('anchor="top right"'):
+                    ui.menu_item('Model Selection').props('disable')
+                    ui.separator()
+                    keys_list = openmind.api_manager.api_keys.items()
+                    for service, key in keys_list:
+                        def create_model_menu_footer(service):
+                            with ui.menu_item(clickable=True, on_click=lambda s=service: select_api(s)):
+                                ui.label(service.capitalize()).classes('font-bold')
+                        create_model_menu_footer(service)
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
     # Start main loop to process user input (reasoning loop started separately if autonomous mode enabled)
@@ -253,27 +330,72 @@ def ollama_page():
     # configure HTML head content from html_head.py external module in the webmind folder
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    
+    # CRITICAL FIX #5: Restore autonomous state BEFORE creating header
+    # Use SettingsManager to restore state synchronously
+    autonomous_state_ref = {'value': settings_manager.get('autonomous_reasoning', False)}
+    openmind.autonomous_reasoning = autonomous_state_ref['value']
+    
+    # Also sync from localStorage if available (for browser-only persistence)
+    async def restore_autonomous_state_before_header():
+        try:
+            stored = await ui.run_javascript('localStorage.getItem("autonomous-reasoning") === "true" || window.restoredAutonomousState === true')
+            if stored:
+                autonomous_state_ref['value'] = True
+                openmind.autonomous_reasoning = True
+                # Sync to SettingsManager
+                settings_manager.set('autonomous_reasoning', True)
+        except:
+            pass
+    
+    ui.timer(0.01, restore_autonomous_state_before_header, once=True)
+    
     drawer = SideNav(current_page='ollama').create_drawer()
-    # Create reactive reference for autonomous reasoning state
-    autonomous_state_ref = {'value': openmind.autonomous_reasoning}
 
     async def toggle_dark_mode():
         dark_mode.value = not dark_mode.value  # toggle dark mode value
-        await ui.run_javascript(
-            f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
-        )
+        # Persist to both localStorage and SettingsManager
+        await ui.run_javascript(f'''
+            localStorage.setItem('theme', '{'dark' if dark_mode.value else 'light'}');
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }}
+        ''')
+        # Sync to SettingsManager
+        settings_manager.set('dark_mode', dark_mode.value)
 
     async def init_theme_from_storage():
-        stored = await ui.run_javascript('localStorage.getItem("theme")')
-        if stored == 'dark':
-            dark_mode.value = True
-        elif stored == 'light':
-            dark_mode.value = False
+        # Load from SettingsManager first (server-side persistence)
+        theme_name = settings_manager.get('theme', 'gruvbox')
+        dark_mode_setting = settings_manager.get('dark_mode', True)
+        
+        # Sync to localStorage (browser persistence)
+        await ui.run_javascript(f'''
+            localStorage.setItem('ui-theme', '{theme_name}');
+            localStorage.setItem('theme', '{'dark' if dark_mode_setting else 'light'}');
+        ''')
+        
+        # Set dark_mode value
+        dark_mode.value = dark_mode_setting
+        
+        # CRITICAL FIX #2: Sync with unified theme system after restoring
+        await ui.run_javascript(f'''
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }}
+        ''')
 
     # Wrapper to sync reactive state with openmind.autonomous_reasoning
-    async def autonomous_change_handler(value):
+    async def autonomous_change_handler(e):
+        # Extract value from event object (NiceGUI's ValueChangeEventArguments)
+        value = e.value if hasattr(e, 'value') else e
         autonomous_state_ref['value'] = value
         openmind.autonomous_reasoning = value
+        # Persist to both localStorage and SettingsManager
+        await ui.run_javascript(f'localStorage.setItem("autonomous-reasoning", "{str(value).lower()}")')
+        settings_manager.set('autonomous_reasoning', value)
         await toggle_autonomous_reasoning(value)
 
     # Create unified navigation header
@@ -284,7 +406,28 @@ def ollama_page():
         autonomous_state=autonomous_state_ref['value']
     )
 
-    ui.timer(0.1, init_theme_from_storage, once=True)
+    # Initialize theme and autonomous state from storage
+    async def init_settings_from_storage():
+        await init_theme_from_storage()
+        # Restore autonomous reasoning state (already set from SettingsManager, but sync from localStorage too)
+        stored_autonomous = await ui.run_javascript('localStorage.getItem("autonomous-reasoning")')
+        if stored_autonomous == 'true':
+            autonomous_state_ref['value'] = True
+            openmind.autonomous_reasoning = True
+            settings_manager.set('autonomous_reasoning', True)
+            await toggle_autonomous_reasoning(True)
+            # Update switch if it exists
+            await ui.run_javascript('''
+                const switches = document.querySelectorAll("input[type=\'checkbox\']");
+                switches.forEach(sw => {
+                    if (sw.closest(".q-switch") && sw.parentElement.textContent.includes("Autonomous")) {
+                        sw.checked = true;
+                        sw.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                });
+            ''')
+    
+    ui.timer(0.1, init_settings_from_storage, once=True)
 
     def select_ollama_model(model_name):
         """Handle model selection from FAB"""
@@ -294,13 +437,7 @@ def ollama_page():
         ui.notify(f'Selected model: {model_name}', type='positive')
         logging.info(f"User selected Ollama model: {model_name}")
 
-    # Ollama model selector FAB - positioned same as main page
-    with ui.page_sticky(position='top-left', x_offset=20, y_offset=80):
-        with ui.button(icon='smart_toy').props('fab color=secondary'):
-            with ui.menu().props('anchor="bottom left"') as ollama_menu:
-                ui.menu_item('Ollama Models').props('disable')
-                ui.separator()
-                ollama_menu_items_container = ui.column()
+    # Ollama model selector moved to footer menu (removed FAB)
 
     def update_ollama_menu():
         """Populate the menu with available Ollama models"""
@@ -313,9 +450,12 @@ def ollama_page():
             else:
                 ui.menu_item('No models found').props('disable')
 
-    # Populate models after menu is created
-    list_ollama_models()
-    update_ollama_menu()
+    # Populate models after UI is built (menu is created in footer below)
+
+    # Chat display area for Ollama responses
+    with ui.column().classes('page-content'):
+        with ui.column().classes('chat-container'):
+            response_output_ollama = ui.markdown().classes('text-lg mt-4')
 
     # terminal-style footer for ollama too
     with ui.footer().classes('footer terminal-footer'):
@@ -323,9 +463,17 @@ def ollama_page():
             ui.label('>').classes('terminal-prefix')
             text = ui.textarea(placeholder='Type your prompt, press Enter to send...').props('rows=1 autogrow').classes('prompt-input')
             ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
+            # Ollama model selector button with dropdown
+            with ui.button(icon='smart_toy').props('round flat').classes('q-ml-sm'):
+                with ui.menu().props('anchor="top right"') as ollama_menu:
+                    ui.menu_item('Ollama Models').props('disable')
+                    ui.separator()
+                    ollama_menu_items_container = ui.column()
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
-    response_output_ollama = ui.markdown().classes('text-lg mt-4')
+    # Now that the menu exists, populate it
+    list_ollama_models()
+    update_ollama_menu()
 
 
 @ui.page('/settings')
@@ -333,28 +481,79 @@ def settings_page():
     """Application settings: appearance and API keys"""
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    
+    # CRITICAL FIX #5: Restore autonomous state BEFORE creating header
+    # Use SettingsManager to restore state synchronously
+    autonomous_state_ref = {'value': settings_manager.get('autonomous_reasoning', False)}
+    openmind.autonomous_reasoning = autonomous_state_ref['value']
+    
+    # Also sync from localStorage if available (for browser-only persistence)
+    async def restore_autonomous_state_before_header():
+        try:
+            stored = await ui.run_javascript('localStorage.getItem("autonomous-reasoning") === "true" || window.restoredAutonomousState === true')
+            if stored:
+                autonomous_state_ref['value'] = True
+                openmind.autonomous_reasoning = True
+                # Sync to SettingsManager
+                settings_manager.set('autonomous_reasoning', True)
+        except:
+            pass
+    
+    ui.timer(0.01, restore_autonomous_state_before_header, once=True)
+    
     drawer = SideNav(current_page='settings').create_drawer()
 
     async def init_theme_from_storage():
-        stored = await ui.run_javascript('localStorage.getItem("theme")')
-        if stored == 'dark':
-            dark_mode.value = True
-        elif stored == 'light':
-            dark_mode.value = False
+        # Load from SettingsManager first (server-side persistence)
+        theme_name = settings_manager.get('theme', 'gruvbox')
+        dark_mode_setting = settings_manager.get('dark_mode', True)
+        
+        # Sync to localStorage (browser persistence)
+        await ui.run_javascript(f'''
+            localStorage.setItem('ui-theme', '{theme_name}');
+            localStorage.setItem('theme', '{'dark' if dark_mode_setting else 'light'}');
+        ''')
+        
+        # Set dark_mode value
+        dark_mode.value = dark_mode_setting
+        
+        # CRITICAL FIX #2: Sync with unified theme system after restoring
+        await ui.run_javascript(f'''
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }}
+        ''')
 
     async def on_theme_switch(e):
         # set according to switch and persist
         dark_mode.value = bool(e.value)
-        await ui.run_javascript(
-            f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
-        )
-
-    # Sync autonomous toggle with backend
-    autonomous_state_ref = {'value': openmind.autonomous_reasoning}
+        # CRITICAL FIX #2: Sync dark mode with unified theme system
+        await ui.run_javascript(f'''
+            localStorage.setItem('theme', '{'dark' if dark_mode.value else 'light'}');
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }} else {{
+                // Fallback: manually sync body--dark class
+                if (document.body) {{
+                    if ({str(dark_mode.value).lower()}) {{
+                        document.body.classList.add('body--dark');
+                    }} else {{
+                        document.body.classList.remove('body--dark');
+                    }}
+                }}
+            }}
+        ''')
+        # Persist to SettingsManager
+        settings_manager.set('dark_mode', dark_mode.value)
 
     async def autonomous_change_handler(value):
         autonomous_state_ref['value'] = value
         openmind.autonomous_reasoning = value
+        # Persist to both localStorage and SettingsManager
+        await ui.run_javascript(f'localStorage.setItem("autonomous-reasoning", "{str(value).lower()}")')
+        settings_manager.set('autonomous_reasoning', value)
         await toggle_autonomous_reasoning(value)
 
     nav = Navigation(current_page='settings', dark_mode=dark_mode, drawer=drawer)
@@ -364,7 +563,29 @@ def settings_page():
         autonomous_state=autonomous_state_ref['value']
     )
 
-    ui.timer(0.1, init_theme_from_storage, once=True)
+    # Initialize theme and autonomous state from storage
+    async def init_settings_from_storage():
+        await init_theme_from_storage()
+        
+        # Restore autonomous reasoning state (already set from SettingsManager, but sync from localStorage too)
+        stored_autonomous = await ui.run_javascript('localStorage.getItem("autonomous-reasoning")')
+        if stored_autonomous == 'true':
+            autonomous_state_ref['value'] = True
+            openmind.autonomous_reasoning = True
+            settings_manager.set('autonomous_reasoning', True)
+            await toggle_autonomous_reasoning(True)
+            # Update switch if it exists
+            await ui.run_javascript('''
+                const switches = document.querySelectorAll("input[type=\'checkbox\']");
+                switches.forEach(sw => {
+                    if (sw.closest(".q-switch") && sw.parentElement.textContent.includes("Autonomous")) {
+                        sw.checked = true;
+                        sw.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                });
+            ''')
+    
+    ui.timer(0.1, init_settings_from_storage, once=True)
 
     with ui.column().classes('w-full max-w-screen-md mx-auto gap-4 p-4'):
         ui.label('Settings').classes('text-2xl font-bold')
@@ -373,7 +594,55 @@ def settings_page():
         with ui.card().classes('w-full'):
             ui.label('Appearance').classes('text-lg font-semibold')
             ui.separator()
-            ui.switch('Dark Mode', value=dark_mode.value, on_change=on_theme_switch)
+            
+            # Dark Mode Toggle
+            with ui.row().classes('items-center justify-between w-full q-mb-md'):
+                ui.label('Dark Mode').classes('font-mono')
+                ui.switch(value=dark_mode.value, on_change=on_theme_switch)
+            
+            # Theme Selector
+            with ui.column().classes('w-full'):
+                ui.label('Color Theme').classes('font-mono q-mb-2')
+                async def change_theme(theme_name):
+                    # CRITICAL FIX #3: Use unified applyTheme function
+                    await ui.run_javascript(f'''
+                        const savedDarkMode = localStorage.getItem('theme') === 'dark';
+                        if (window.applyTheme) {{
+                            window.applyTheme('{theme_name}', savedDarkMode);
+                        }} else {{
+                            // Fallback if applyTheme not available
+                            if (document.body) {{
+                                document.body.setAttribute('data-theme', '{theme_name}');
+                            }}
+                            if (document.documentElement) {{
+                                document.documentElement.setAttribute('data-theme', '{theme_name}');
+                            }}
+                            if (window.updateThemeStyle) {{
+                                window.updateThemeStyle('{theme_name}');
+                            }}
+                        }}
+                        localStorage.setItem('ui-theme', '{theme_name}');
+                    ''')
+                    # Persist to SettingsManager
+                    settings_manager.set('theme', theme_name)
+                    ui.notify(f'Theme changed to {theme_name}', type='positive')
+                
+                async def init_theme_selector():
+                    saved = await ui.run_javascript('localStorage.getItem("ui-theme") || "gruvbox"')
+                    theme_select.value = saved
+                
+                theme_select = ui.select(
+                    options={
+                        'gruvbox': '🎨 Gruvbox',
+                        'everforest': '🌲 Everforest',
+                        'nord': '❄️ Nord',
+                        'catppuccin': '☕ Catppuccin Mocha'
+                    },
+                    value='gruvbox',
+                    on_change=lambda e: change_theme(e.value)
+                ).classes('theme-selector w-full').props('outlined')
+                
+                ui.timer(0.1, init_theme_selector, once=True)
 
         # API Keys Card
         with ui.card().classes('w-full'):
@@ -395,11 +664,26 @@ def logs_page():
     drawer = SideNav(current_page='logs').create_drawer()
 
     async def init_theme_from_storage():
-        stored = await ui.run_javascript('localStorage.getItem("theme")')
-        if stored == 'dark':
-            dark_mode.value = True
-        elif stored == 'light':
-            dark_mode.value = False
+        # Load from SettingsManager first (server-side persistence)
+        theme_name = settings_manager.get('theme', 'gruvbox')
+        dark_mode_setting = settings_manager.get('dark_mode', True)
+        
+        # Sync to localStorage (browser persistence)
+        await ui.run_javascript(f'''
+            localStorage.setItem('ui-theme', '{theme_name}');
+            localStorage.setItem('theme', '{'dark' if dark_mode_setting else 'light'}');
+        ''')
+        
+        # Set dark_mode value
+        dark_mode.value = dark_mode_setting
+        
+        # CRITICAL FIX #2: Sync with unified theme system after restoring
+        await ui.run_javascript(f'''
+            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            if (window.applyTheme) {{
+                window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
+            }}
+        ''')
 
     # simple header
     nav = Navigation(current_page='logs', dark_mode=dark_mode, drawer=drawer)
