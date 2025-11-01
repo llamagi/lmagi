@@ -3,7 +3,7 @@
 ollama integration NOT yet integrated with the reasoning components
 
 ![lmAGI](./gfx/llamagi.jpg)
-
+<a href="https://github.com/easyAGI/fastAGI/blob/main/automind/display_helpers.py">display helpers</a><br /> 
 # lmAGI
 language model Augmented Generative Intelligence<br />
 this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/">easyAGI</a> roadmap to display the reasoning capabilities as log files<br />
