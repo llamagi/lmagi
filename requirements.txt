@@ -1,29 +1,84 @@
+# ========================================
+# lmagi - easyAGI Requirements
+# ========================================
+# (c) Gregory L. Magnusson MIT license 2024
+# Python >= 3.9 required
+
+# ========================================
+# LLM API Clients
+# ========================================
+
 # interact with the OpenAI API
-openai==1.36.0
+openai>=1.36.0,<2.0.0
 
 # interact with llama3 groq API models
-groq==0.9.0
+groq>=0.9.0,<1.0.0
 
 # interact with the together.ai API models
-together==1.2.2
+together>=1.2.2,<2.0.0
 
 # interact with the ai71 Falcon models https://marketplace.ai71.ai/
-ai71==0.0.18
+ai71>=0.0.18,<1.0.0
+
+# ========================================
+# Configuration Management
+# ========================================
 
 # load API environment variables from a .env file
-python-dotenv
+python-dotenv>=1.0.0
+
+# ========================================
+# Web UI Framework
+# ========================================
 
 # for UI integration as fastapi
-nicegui==1.4.29
+nicegui>=1.4.29,<2.0.0
+
+# FastAPI dependencies (automatically installed with NiceGUI)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# ========================================
+# Async & Networking
+# ========================================
 
 # high performance asynchronous HTTP client/server
-aiohttp==3.9.5
+aiohttp>=3.9.5,<4.0.0
 
-# concurrent async/await code for asynchronous I/O
-asyncio==3.4.3
+# Note: asyncio is part of Python standard library (Python 3.4+)
+# No need to install separately for Python >= 3.9
+
+# ========================================
+# Data Processing
+# ========================================
 
 # For fast JSON processing
-ujson==5.10.0
+ujson>=5.10.0
+
+# Safe expression evaluation (replaces eval for security)
+simpleeval>=0.9.13
+
+# ========================================
+# System Utilities
+# ========================================
 
 # system and process utilities
-psutil==6.0.0
+psutil>=6.0.0
+
+# ========================================
+# GUI Framework (for native desktop app)
+# ========================================
+
+# PyQt6 for native GUI wrapper
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# ========================================
+# Optional: Development Dependencies
+# ========================================
+# Uncomment these for development
+
+# pytest>=7.4.0  # Testing framework
+# black>=23.0.0  # Code formatter
+# flake8>=6.0.0  # Linter
+# mypy>=1.5.0    # Type checker

@@ -4,8 +4,8 @@
 import logging
 from automind.SocraticReasoning import SocraticReasoning
 from automind.logic import LogicTables
-from memory.memory import store_in_stm, DialogEntry
-from webmind.chatter import GPT4o, Groq
+from memory.memory import store_in_stm, DialogEntry, create_memory_folders
+from webmind.chatter import GPT4o, GroqModel
 from webmind.api import APIManager  # ensure this import statement is added
 
 class AGI:

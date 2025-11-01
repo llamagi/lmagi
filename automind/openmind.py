@@ -17,7 +17,7 @@ from nicegui import ui  # importing ui for easyAGI
 from memory.memory import create_memory_folders, store_in_stm, save_conversation_memory, save_internal_reasoning, DialogEntry, save_valid_truth
 from webmind.ollama_handler import OllamaHandler  # Import OllamaHandler for modular Ollama interactions
 from automind.automind import FundamentalAGI
-from webmind.chatter import GPT4o, GroqModel, TogetherModel, AI71Model
+from webmind.chatter import GPT4o, GroqModel, TogetherModel, AI71Model, OllamaModel
 from webmind.api import APIManager
 import ujson as json
 import asyncio
@@ -39,13 +39,42 @@ class OpenMind:
         self.keys_container = ui.column()  # initialize keys_container
         self.log = None  # placeholder for log
         self.initialization_warning_shown = False
+        self.autonomous_reasoning = False  # Track autonomous reasoning state
+        self.reasoning_task = None  # Track reasoning task for cancellation
+        self.tasks = set()  # Track all asyncio tasks for cleanup
 
     def initialize_memory(self):
         create_memory_folders()
 
+    def _create_task(self, coro):
+        """Create and track an asyncio task"""
+        task = asyncio.create_task(coro)
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
+        return task
+
+    async def cleanup(self):
+        """Cancel all tracked tasks and clean up resources"""
+        # Cancel reasoning task if it exists
+        if self.reasoning_task and not self.reasoning_task.done():
+            self.reasoning_task.cancel()
+        
+        # Cancel all tracked tasks
+        for task in self.tasks.copy():
+            if not task.done():
+                task.cancel()
+        
+        # Wait for all cancellations to complete
+        if self.tasks:
+            await asyncio.gather(*self.tasks, return_exceptions=True)
+        self.tasks.clear()
+        
+        # Clear reasoning task reference
+        self.reasoning_task = None
+
     def use_api_key(self, service, key):
         self.api_manager.api_keys[service] = key
-        asyncio.create_task(self.initialize_agi())
+        self._create_task(self.initialize_agi())
         if self.message_container.client.connected:
             with self.message_container:
                 ui.notify(f'Using API key for {service}', type='positive')
@@ -58,7 +87,7 @@ class OpenMind:
         if service and api_key:
             self.api_manager.api_keys[service] = api_key
             self.api_manager.save_api_key(service, api_key)
-            asyncio.create_task(self.initialize_agi())
+            self._create_task(self.initialize_agi())
             if self.message_container.client.connected:
                 ui.notify(f'API key for {service} added and loaded successfully')
             self.service_input.value = ''
@@ -72,7 +101,7 @@ class OpenMind:
         if service in self.api_manager.api_keys:
             del self.api_manager.api_keys[service]
             self.api_manager.remove_api_key(service)
-            asyncio.create_task(self.initialize_agi())
+            self._create_task(self.initialize_agi())
             if self.message_container.client.connected:
                 ui.notify(f'API key for {service} removed successfully')
             self.list_api_keys()  # Refresh the list after deletion
@@ -197,12 +226,16 @@ class OpenMind:
         elif llama_running:
             # Call ollama_handler to list models when LLaMA is found running
             models = self.ollama_handler.list_models()
-            if models:
-                model_list = ", ".join(models)
+            if models and len(models) > 1:  # First line is header
+                # Extract first available model name
+                first_model = models[1].split()[0] if len(models) > 1 else "llama3"
+                chatter = OllamaModel(model=first_model)
+                self.agi_instance = FundamentalAGI(chatter)
+                model_list = ", ".join([m.split()[0] for m in models[1:]])
                 if self.message_container.client.connected:
                     with self.message_container:
-                        ui.notify(f'LLaMA found running. Models available: {model_list}')
-                logging.debug(f"LLaMA running on localhost:11434. Models available: {model_list}")
+                        ui.notify(f'Using Ollama for ezAGI with model: {first_model}')
+                logging.debug(f"AGI initialized with Ollama model: {first_model}. Available: {model_list}")
             else:
                 if self.message_container.client.connected:
                     with self.message_container:
@@ -282,13 +315,13 @@ class OpenMind:
         """
         Display internal reasoning conclusion in the response window and log it to a JSON file
         """
-        if conclusion != "No premises available for logic as conclusion":
+        if conclusion != "No premises available for logic as conclusion.":
             if self.message_container.client.connected:
                 with self.message_container:
                     response_message = ui.chat_message(name='intr', sent=False)
                     response_message.clear()
                     with response_message:
-                        ui.html(f"{conclusion}")
+                        ui.markdown(conclusion)
             logging.info(f"Internal reasoning conclusion: {conclusion}")
 
         # Determine which log file to write to
@@ -320,8 +353,10 @@ class OpenMind:
         """
         Main loop to handle both internal reasoning and user input.
         """
-        reasoning_task = asyncio.create_task(self.reasoning_loop())
-        reasoning_task.add_done_callback(self._handle_task_result)
+        # Start reasoning loop only if autonomous reasoning is enabled
+        if self.autonomous_reasoning:
+            reasoning_task = self._create_task(self.reasoning_loop())
+            reasoning_task.add_done_callback(self._handle_task_result)
 
         while True:
             prompt = await self.internal_queue.get()
@@ -345,7 +380,7 @@ class OpenMind:
             if response_message and self.message_container.client.connected:
                 response_message.clear()
                 with response_message:
-                    ui.html(conclusion)
+                    ui.markdown(conclusion)
 
             await self.run_javascript_with_retry('window.scrollTo(0, document.body.scrollHeight)', retries=3, timeout=30.1)
 
@@ -397,21 +432,3 @@ class OpenMind:
         except Exception as e:
             logging.error(f"Error reading log file {file_path}: {e}")
             return f"Error reading log file {file_path}: {e}"
-
-    def handle_javascript_response(self, msg):
-        request_id = msg.get('request_id')
-        result = msg.get('result', None)
-
-        if request_id is not None:
-            if result is not None:
-                JavaScriptRequest.resolve(request_id, result)
-            else:
-                # Handle the case where 'result' is missing
-                JavaScriptRequest.reject(request_id, 'Missing result in JavaScript response')
-                logging.error(f"JavaScript response missing 'result' for request_id: {request_id}. Response: {msg}")
-        else:
-            # Handle the case where 'request_id' is missing if needed
-            logging.error(f"JavaScript response missing 'request_id'. Response: {msg}")
-
-        # Log the entire message for debugging purposes
-        logging.debug(f"Received JavaScript response: {msg}")

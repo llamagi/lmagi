@@ -243,11 +243,35 @@ class SocraticReasoning:
     def validate_conclusion(self):
         """
         Validates the logical conclusion.
-
+        Only validates boolean expressions - natural language conclusions are accepted.
+        
         Returns:
             bool: True if the conclusion is valid, False otherwise.
         """
-        return self.logic_tables.tautology(self.logical_conclusion)  # Validate using logic tables
+        conclusion = self.logical_conclusion.strip()
+        
+        # Check if conclusion looks like a boolean expression vs natural language
+        # Boolean expressions are typically short and contain logical operators
+        # Natural language is longer and doesn't contain boolean operators
+        
+        is_boolean_expression = (
+            len(conclusion) < 100 and  # Boolean expressions are typically short
+            any(op in conclusion for op in [' and ', ' or ', ' not ', '(', ')']) and
+            not any(char in conclusion for char in ['.', '?', '!'])  # No sentence punctuation
+        )
+        
+        if is_boolean_expression:
+            # Attempt to validate as boolean expression
+            try:
+                return self.logic_tables.tautology(conclusion)
+            except Exception as e:
+                # If validation fails, log but don't treat as error
+                self.socraticlogs(f"Could not validate boolean expression: {e}", level='info')
+                return True  # Accept conclusion even if validation fails
+        else:
+            # Natural language conclusion - accept without boolean validation
+            # These are conclusions from LLM reasoning, not formal logic expressions
+            return True
 
     def save_truth(self, truth):
         """

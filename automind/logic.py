@@ -14,6 +14,7 @@ import logging
 import datetime
 import pathlib
 import json
+from simpleeval import simple_eval
 from memory.memory import create_memory_folders, save_valid_truth, store_in_stm, DialogEntry
 
 class LogicTables:
@@ -122,22 +123,26 @@ class LogicTables:
             json.dump(truth_data, file)
 
     def evaluate_expression(self, expr, values):
-        allowed_operators = {
-            'and': lambda x, y: x and y,
-            'or': lambda x, y: x or y,
-            'not': lambda x: not x,
-            'xor': lambda x, y: x ^ y,
-            'nand': lambda x, y: not (x and y),
-            'nor': lambda x, y: not (x or y),
-            'implication': lambda x, y: not x or y
-        }
-
+        """
+        Safely evaluate a logical expression using simpleeval instead of eval.
+        This prevents code injection attacks while allowing logical operations.
+        
+        Note: simpleeval handles standard Python boolean operators (and, or, not).
+        For custom operators, expressions should use standard Python syntax.
+        """
         try:
-            result = eval(expr, {"__builtins__": None}, {**allowed_operators, **values})
+            # simpleeval safely evaluates Python expressions
+            # It allows: names, operators, comparisons, but NOT function calls (unless explicitly allowed)
+            # or imports or any code execution
+            result = simple_eval(
+                expr,
+                names=values  # Variables from the truth table
+            )
             self.log(f"Evaluated expression '{expr}' with values {values}: {result}")
-            return result
+            return bool(result)  # Ensure boolean result
         except Exception as e:
             self.log(f"Error evaluating expression '{expr}': {e}", level='error')
+            # Fallback: if simpleeval fails, return False rather than using eval
             return False
 
     def generate_truth_table(self):

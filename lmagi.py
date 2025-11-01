@@ -1,23 +1,29 @@
-# lmagi.py ollama integration
+# lmagi.py - Backend web server for easyAGI
 # lmagi (c) Gregory L. Magnusson MIT license 2024
 # easyAGI (c) Gregory L. Magnusson MIT license 2024
 # easy augmented generative intelligence UIUX
 # multi-model LLM with automind reasoning from premise to draw_conclusion
 # conversation from main_loop(self) is saved to ./memory/stm/timestampmemory.json from memory.py creating short term memory store of input response
 # reasoning_loop(self)conversation from internal_conclusions are saved in ./memory/logs/thoughts.json
-# lmagi ollama integration v1
+# 
+# ENTRYPOINT: Use lmagi_gui.py to launch the application (preferred method)
+# This file can also be run directly for development/testing: python lmagi.py
 
 
 from nicegui import ui, app  # handle UIUX
 from fastapi.staticfiles import StaticFiles  # integrate fastapi static folder and gfx folder
 from webmind.ollama_handler import OllamaHandler  # Import OllamaHandler for modular Ollama interactions
 from webmind.html_head import add_head_html  # handler for the html head imports and meta tags
+from webmind.navigation import Navigation  # Unified navigation system
 from automind.openmind import OpenMind  # Importing OpenMind class from openmind.py
 import concurrent.futures
 import ujson as json
 import asyncio
 import aiohttp
 import logging
+import signal
+import sys
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -32,11 +38,20 @@ ollama_model = OllamaHandler()  # initialize OllamaHandler instance
 async def toggle_autonomous_reasoning(value):
     openmind.autonomous_reasoning = value
     if value:
-        openmind.reasoning_task = asyncio.create_task(openmind.main_loop())
+        # Start reasoning loop task if not already running
+        if not openmind.reasoning_task or openmind.reasoning_task.done():
+            openmind.reasoning_task = openmind._create_task(openmind.reasoning_loop())
+            logging.info("Autonomous reasoning enabled")
     else:
-        if openmind.reasoning_task:
+        # Stop reasoning loop task
+        if openmind.reasoning_task and not openmind.reasoning_task.done():
             openmind.reasoning_task.cancel()
+            try:
+                await openmind.reasoning_task
+            except asyncio.CancelledError:
+                pass
             openmind.reasoning_task = None
+            logging.info("Autonomous reasoning disabled")
 
 @ui.page('/')
 def main():
@@ -70,30 +85,42 @@ def main():
     # configure HTML head content from html_head.py external module in the webmind folder
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    # Create reactive reference for autonomous reasoning state
+    autonomous_state_ref = {'value': openmind.autonomous_reasoning}
 
     async def toggle_dark_mode():
         dark_mode.value = not dark_mode.value  # toggle dark mode value
-        dark_mode_toggle.set_text('Light Mode' if dark_mode.value else 'Dark Mode')  # update button
-        dark_mode_toggle.classes(remove='light-mode-toggle' if dark_mode.value else 'dark-mode-toggle')  # class remove for dark-mode / light-mode
-        dark_mode_toggle.classes(add='dark-mode-toggle' if dark_mode.value else 'light-mode-toggle')  # dark_mode toggle switch
-
         # update log button styles based on dark mode
         for button in log_buttons:
             button.classes(remove='light-log-buttons' if dark_mode.value else 'dark-log-buttons')
             button.classes(add='dark-log-buttons' if dark_mode.value else 'light-log-buttons')
 
-    # create a row for the dark mode toggle button and FAB buttons
-    with ui.row().classes('justify-between w-full p-4'):
-        with ui.row().classes('items-center'):
-            with ui.element('q-fab').props('icon=menu color=blue position=fixed top-2 left-2'):
-                fab_action_container_api = ui.element('div').props('vertical')
+    # Wrapper to sync reactive state with openmind.autonomous_reasoning
+    async def autonomous_change_handler(value):
+        autonomous_state_ref['value'] = value
+        openmind.autonomous_reasoning = value
+        await toggle_autonomous_reasoning(value)
+
+    # Create unified navigation header
+    nav = Navigation(current_page='chat', dark_mode=dark_mode)
+    nav.create_header(
+        autonomous_callback=autonomous_change_handler,
+        dark_mode_callback=toggle_dark_mode,
+        autonomous_state=autonomous_state_ref['value']
+    )
+
+    # Model selector FAB (floating action button)
+    with ui.page_sticky(position='top-left', x_offset=20, y_offset=80):
+        with ui.button(icon='psychology').props('fab color=primary'):
+            with ui.menu().props('anchor="bottom left"'):
+                ui.menu_item('Model Selection').props('disable')
+                ui.separator()
                 keys_list = openmind.api_manager.api_keys.items()
                 for service, key in keys_list:
-                    def create_fab_action(service):
-                        ui.element('q-fab-action').props(f'icon=label color=green-5 label="{service}"').on('click', lambda: select_api(service))
-                    create_fab_action(service)
-        dark_mode_toggle = ui.button('Dark Mode', on_click=toggle_dark_mode).classes('light-mode-toggle')
-        ui.switch('Autonomous Reasoning', on_change=toggle_autonomous_reasoning).props('checked=False')
+                    def create_model_menu(service):
+                        with ui.menu_item(clickable=True, on_click=lambda s=service: select_api(s)):
+                            ui.label(service.capitalize()).classes('font-bold')
+                    create_model_menu(service)
 
     # define log files and their paths
     log_files = {
@@ -112,12 +139,11 @@ def main():
         with log_container:
             ui.markdown(log_content).classes('w-full')  # Display log content
 
-    # create tabs menu for chat, logs, API keys, and admin
+    # create tabs menu for chat, logs, and API keys
     with ui.tabs().classes('w-full') as tabs:
-        chat_tab = ui.tab('chat').classes('tab-style')
-        logs_tab = ui.tab('logs').classes('tab-style')
-        api_tab = ui.tab('APIk').classes('tab-style')
-        admin_tab = ui.tab('lmagi').classes('tab-style').on('click', lambda: ui.open('/ollama'))
+        chat_tab = ui.tab('chat', label='💬 Chat', icon='chat').classes('tab-style')
+        logs_tab = ui.tab('logs', label='📊 Logs', icon='description').classes('tab-style')
+        api_tab = ui.tab('api', label='🔑 API Keys', icon='vpn_key').classes('tab-style')
 
     # create tab panels for the tabs
     with ui.tab_panels(tabs, value=chat_tab).props('style="background-color: rgba(255, 255, 255, 0.5);"').classes('response-style'):
@@ -154,23 +180,29 @@ def main():
             text = ui.input(placeholder='Enter text here').classes('input').on('keydown.enter', send)  # input field with enter key event
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
-    # openmind internal reasoning asynchronous task ensuring non-blocking execution and efficient concurrency
-    asyncio.create_task(openmind.main_loop())
+    # Start main loop to process user input (reasoning loop started separately if autonomous mode enabled)
+    # Note: main_loop processes user input queue; reasoning_loop handles autonomous reasoning
+    openmind._create_task(openmind.main_loop())
 
 logging.debug("starting easyAGI")
-ui.run(title='easyAGI')
 
-if __name__ == '__main__':
+# Entry point - only run when launched directly (not when imported)
+# Note: lmagi_gui.py is the preferred entrypoint for normal use
+if __name__ in {"__main__", "__mp_main__"}:
+    # Check if running in headless mode (launched by GUI)
+    headless = os.environ.get('LMAGI_HEADLESS', '0') == '1'
     try:
-        main()
+        ui.run(title='easyAGI', port=8080, show=not headless)
     except KeyboardInterrupt:
         logging.info("Shutting down...")
+        sys.exit(0)
 
 @ui.page('/ollama')
 def ollama_page():
-    global ollama_models, selected_model, response_output_ollama
+    global ollama_models, selected_model, response_output_ollama, ollama_menu_container
     ollama_models = []  # List to store Ollama model references
     selected_model = None  # Variable to store selected Ollama model
+    ollama_menu_container = None  # Container for model menu items
 
     async def send() -> None:
         question = text.value  # get value from input field
@@ -206,7 +238,8 @@ def ollama_page():
                             data = json.loads(line.decode('utf-8'))
                             if "response" in data:
                                 response_content += data["response"]
-                                response_output_ollama.set_text(response_content)
+                                # Update with markdown rendering for streaming
+                                response_output_ollama.set_content(response_content)
                                 logging.debug(f"Received response chunk: {data['response']}")
                             elif "error" in data:
                                 logging.error(f"Error in response: {data['error']}")
@@ -227,12 +260,6 @@ def ollama_page():
             logging.error(f"Error generating response: {e}")
             ui.notify(f"Error generating response: {e}", type='negative')
 
-    def select_ollama_model(model_name):
-        global selected_model
-        selected_model = model_name
-        ui.notify(f'Selected model: {model_name}', type='info')
-        logging.info(f"Selected model: {model_name}")
-
     def list_ollama_models():
         try:
             logging.debug("Running 'ollama list' command.")
@@ -240,11 +267,11 @@ def ollama_page():
             if result:
                 logging.debug(f"'ollama list' output:\n{result}")
                 global ollama_models
-                ollama_models = [line.split()[0] for line in result[1:]]  # Extract model names
-                if ollama_models:
+                ollama_models = result  # Keep the full result list
+                if ollama_models and len(ollama_models) > 1:
                     ui.notify('Models listed successfully.', type='positive')
                     logging.info("Models listed successfully.")
-                    update_ollama_fab_actions()
+                    update_ollama_menu()
                 else:
                     ui.notify('No models found.', type='negative')
                     logging.warning("No models found.")
@@ -255,30 +282,59 @@ def ollama_page():
             logging.error(f"Exception during model listing: {e}")
             ui.notify('Exception occurred while listing models.', type='negative')
 
-    def update_ollama_fab_actions():
-        fab_action_container_ollama.clear()
-        for model in ollama_models:
-            with fab_action_container_ollama:
-                ui.element('q-fab-action').props(f'icon=label color=green-5 label="{model}"').on('click', lambda m=model: select_ollama_model(m))
-
     # configure HTML head content from html_head.py external module in the webmind folder
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    # Create reactive reference for autonomous reasoning state
+    autonomous_state_ref = {'value': openmind.autonomous_reasoning}
 
     async def toggle_dark_mode():
         dark_mode.value = not dark_mode.value  # toggle dark mode value
-        dark_mode_toggle.set_text('Light Mode' if dark_mode.value else 'Dark Mode')  # update button
-        dark_mode_toggle.classes(remove='light-mode-toggle' if dark_mode.value else 'dark-mode-toggle')  # class remove for dark-mode / light-mode
-        dark_mode_toggle.classes(add='dark-mode-toggle' if dark_mode.value else 'light-mode-toggle')  # dark_mode toggle switch
 
-    # create a row for the dark mode toggle button and FAB buttons
-    with ui.row().classes('justify-between w-full p-4'):
-        with ui.row().classes('items-center'):
-            with ui.element('q-fab').props('icon=menu color=blue position=fixed top-2 left-2'):
-                fab_action_container_ollama = ui.element('div').props('vertical')
-                list_ollama_models()  # Initialize Ollama models on startup
-        dark_mode_toggle = ui.button('Dark Mode', on_click=toggle_dark_mode).classes('light-mode-toggle')
-        ui.switch('Autonomous Reasoning', on_change=toggle_autonomous_reasoning).props('checked=False')
+    # Wrapper to sync reactive state with openmind.autonomous_reasoning
+    async def autonomous_change_handler(value):
+        autonomous_state_ref['value'] = value
+        openmind.autonomous_reasoning = value
+        await toggle_autonomous_reasoning(value)
+
+    # Create unified navigation header
+    nav = Navigation(current_page='ollama', dark_mode=dark_mode)
+    nav.create_header(
+        autonomous_callback=autonomous_change_handler,
+        dark_mode_callback=toggle_dark_mode,
+        autonomous_state=autonomous_state_ref['value']
+    )
+
+    def select_ollama_model(model_name):
+        """Handle model selection from FAB"""
+        global selected_model
+        selected_model = model_name
+        ollama_model.select_model(model_name)
+        ui.notify(f'Selected model: {model_name}', type='positive')
+        logging.info(f"User selected Ollama model: {model_name}")
+
+    # Ollama model selector FAB - positioned same as main page
+    with ui.page_sticky(position='top-left', x_offset=20, y_offset=80):
+        with ui.button(icon='smart_toy').props('fab color=secondary'):
+            with ui.menu().props('anchor="bottom left"') as ollama_menu:
+                ui.menu_item('Ollama Models').props('disable')
+                ui.separator()
+                ollama_menu_items_container = ui.column()
+
+    def update_ollama_menu():
+        """Populate the menu with available Ollama models"""
+        ollama_menu_items_container.clear()
+        with ollama_menu_items_container:
+            if ollama_models and len(ollama_models) > 1:
+                for model_line in ollama_models[1:]:  # Skip header line
+                    model_name = model_line.split()[0]
+                    ui.menu_item(model_name, on_click=lambda m=model_name: select_ollama_model(m))
+            else:
+                ui.menu_item('No models found').props('disable')
+
+    # Populate models after menu is created
+    list_ollama_models()
+    update_ollama_menu()
 
     # footer as input field and with external markdown link
     with ui.footer().classes('footer'), ui.column().classes('footer'):
@@ -286,13 +342,14 @@ def ollama_page():
             text = ui.input(placeholder='Enter text here').classes('input').on('keydown.enter', send)  # input field with enter key event
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
-    response_output_ollama = ui.label().classes('text-lg mt-4')
+    response_output_ollama = ui.markdown().classes('text-lg mt-4')
 
-logging.debug("starting easyAGI for Ollama")
-ui.run(title='easyAGI - Ollama')
-
-if __name__ == '__main__':
-    try:
-        ollama_page()
-    except KeyboardInterrupt:
-        logging.info("Shutting down...")
+def signal_handler(sig, frame):
+    """Handle graceful shutdown on SIGINT and SIGTERM"""
+    logging.info(f"Received signal {sig}. Shutting down gracefully...")
+    # Clean up any running tasks
+    if hasattr(openmind, 'cleanup'):
+        # Note: cleanup is async, but signal handler can't be async
+        # In production, consider using asyncio.run() or proper async shutdown
+        logging.info("Cleaning up tasks...")
+    sys.exit(0)
