@@ -5,7 +5,7 @@
 ![lmAGI](./gfx/llamagi.jpg)
 <a href="https://github.com/easyAGI/fastAGI/blob/main/automind/display_helpers.py">display helpers</a><br /> 
 # lmAGI
-language model Augmented Generative Intelligence<br />
+local model / language model Augmented Generative Intelligence<br />
 this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/">easyAGI</a> roadmap to display the reasoning capabilities as log files<br />
 integration with ollama point of departure can be found at <a href="https://github.com/llamagi/lmagi">lmagi</a><br />
 project development has migrated to the <a href="https://github.com/easyAGI/">easyAGI</a> roadmap<br />
