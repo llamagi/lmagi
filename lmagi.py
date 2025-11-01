@@ -231,7 +231,7 @@ def main():
     with ui.footer().classes('footer terminal-footer'):
         with ui.row().classes('w-full items-center gap-2'):
             ui.label('>').classes('terminal-prefix')
-            text = ui.textarea(placeholder='Type your prompt, press Enter to send...').props('rows=1 autogrow').classes('prompt-input')
+            text = ui.textarea(placeholder='Type your prompt (Enter=send, Shift+Enter=newline)').props('rows=1 autogrow').classes('prompt-input')
             ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
             # API model selector button with dropdown menu
             with ui.button(icon='psychology').props('round flat').classes('q-ml-sm'):
@@ -245,6 +245,21 @@ def main():
                                 ui.label(service.capitalize()).classes('font-bold')
                         create_model_menu_footer(service)
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
+    # Install Enter/Shift+Enter handler on prompt
+    ui.timer(0.05, lambda: ui.run_javascript('''
+        (function(){
+          const area = document.querySelector('.prompt-input textarea');
+          if (!area || area.__enterHandlerInstalled) return;
+          area.__enterHandlerInstalled = true;
+          area.addEventListener('keydown', function(ev){
+            if (ev.key === 'Enter' && !ev.shiftKey) {
+              ev.preventDefault();
+              const btn = document.querySelector('.send-btn');
+              if (btn) btn.click();
+            }
+          });
+        })();
+    '''), once=True)
 
     # Start main loop to process user input (reasoning loop started separately if autonomous mode enabled)
     # Note: main_loop processes user input queue; reasoning_loop handles autonomous reasoning
@@ -307,6 +322,11 @@ def ollama_page():
                                 # Update with markdown rendering for streaming
                                 response_output_ollama.set_content(response_content)
                                 logging.debug(f"Received response chunk: {data['response']}")
+                                # Auto scroll chat container as content streams
+                                try:
+                                    await ui.run_javascript('const c=document.querySelector(".chat-container"); if(c){c.scrollTop=c.scrollHeight;}')
+                                except Exception:
+                                    pass
                             elif "error" in data:
                                 logging.error(f"Error in response: {data['error']}")
                                 ui.notify(f"Error: {data['error']}", type='negative')
@@ -487,7 +507,7 @@ def ollama_page():
     with ui.footer().classes('footer terminal-footer'):
         with ui.row().classes('w-full items-center gap-2'):
             ui.label('>').classes('terminal-prefix')
-            text = ui.textarea(placeholder='Type your prompt, press Enter to send...').props('rows=1 autogrow').classes('prompt-input')
+            text = ui.textarea(placeholder='Type your prompt (Enter=send, Shift+Enter=newline)').props('rows=1 autogrow').classes('prompt-input')
             ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
             # Ollama model selector button with dropdown
             with ui.button(icon='smart_toy').props('round flat').classes('q-ml-sm'):
@@ -496,17 +516,21 @@ def ollama_page():
                     ui.separator()
                     ollama_menu_items_container = ui.column()
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
-
-    # Now that the menu exists, populate it
-    list_ollama_models()
-    update_ollama_menu()
-    # Auto-select first available Ollama model if present
-    try:
-        if (not selected_model) and ollama_models and len(ollama_models) > 1:
-            first_model = ollama_models[1].split()[0]
-            select_ollama_model(first_model)
-    except Exception:
-        pass
+    # Install Enter/Shift+Enter handler on prompt (ollama)
+    ui.timer(0.05, lambda: ui.run_javascript('''
+        (function(){
+          const area = document.querySelector('.prompt-input textarea');
+          if (!area || area.__enterHandlerInstalled) return;
+          area.__enterHandlerInstalled = true;
+          area.addEventListener('keydown', function(ev){
+            if (ev.key === 'Enter' && !ev.shiftKey) {
+              ev.preventDefault();
+              const btn = document.querySelector('.send-btn');
+              if (btn) btn.click();
+            }
+          });
+        })();
+    '''), once=True)
 
 
 @ui.page('/settings')
