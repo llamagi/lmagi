@@ -522,7 +522,7 @@ def add_head_html(ui):
             const pageContent = document.querySelectorAll('.page-content');
             pageContent.forEach(el => {
                 if (!el) return;
-                // Anchor between header and footer using fixed positioning
+                // Anchor between header and footer using fixed positioning (CSS controls left/right)
                 el.style.position = 'fixed';
                 el.style.top = '60px';
                 el.style.bottom = footerHeight + 'px';
@@ -549,15 +549,41 @@ def add_head_html(ui):
         }
         
         function updateLayoutForSidebar(width) {
+            // Drive layout via CSS variable so width adjusts fluidly
+            document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+            // Ensure page content uses left/right anchoring (no padding-left)
             const pageContent = document.querySelectorAll('.page-content');
+            pageContent.forEach(el => { if (el) { el.style.paddingLeft = '0'; } });
+            // Footer still needs left padding so its content clears the drawer
             const footerElements = document.querySelectorAll('.terminal-footer');
-            const allElements = [...pageContent, ...footerElements];
-            allElements.forEach(el => {
-                if (el) {
-                    el.style.paddingLeft = width + 'px';
-                }
-            });
+            footerElements.forEach(el => { if (el) { el.style.paddingLeft = width + 'px'; } });
         }
+
+        // Collapsible sidebar controls
+        window.setSidebarCollapsed = function(collapsed) {
+            try {
+                localStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');
+                const drawer = document.querySelector('.left-drawer');
+                const savedWidth = parseInt(localStorage.getItem('sidebar-width') || '260');
+                const width = collapsed ? 0 : Math.min(Math.max(savedWidth || 260, 200), 500);
+                if (drawer) {
+                    if (collapsed) {
+                        drawer.classList.add('collapsed');
+                        document.body.classList.add('sidebar-collapsed');
+                    } else {
+                        drawer.classList.remove('collapsed');
+                        drawer.style.width = width + 'px';
+                        document.body.classList.remove('sidebar-collapsed');
+                    }
+                }
+                updateLayoutForSidebar(width);
+            } catch (e) { console.error(e); }
+        };
+
+        window.toggleSidebarCollapse = function() {
+            const collapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+            window.setSidebarCollapsed(!collapsed);
+        };
 
         // Auto-scroll helpers
         function scrollChatToBottom() {
@@ -595,22 +621,46 @@ def add_head_html(ui):
             
             // Initialize sidebar width from localStorage
             const savedSidebarWidth = localStorage.getItem('sidebar-width');
+            const initialCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
             if (savedSidebarWidth) {
                 const drawer = document.querySelector('.left-drawer');
                 if (drawer) {
-                    drawer.style.width = savedSidebarWidth + 'px';
-                    updateLayoutForSidebar(parseInt(savedSidebarWidth));
+                    if (initialCollapsed) {
+                        drawer.classList.add('collapsed');
+                        document.body.classList.add('sidebar-collapsed');
+                        updateLayoutForSidebar(0);
+                    } else {
+                        drawer.style.width = savedSidebarWidth + 'px';
+                        document.body.classList.remove('sidebar-collapsed');
+                        updateLayoutForSidebar(parseInt(savedSidebarWidth));
+                    }
                 } else {
                     // Wait for drawer to appear
                     const drawerObserver = new MutationObserver(function(mutations, obs) {
                         const drawer = document.querySelector('.left-drawer');
                         if (drawer) {
-                            drawer.style.width = savedSidebarWidth + 'px';
-                            updateLayoutForSidebar(parseInt(savedSidebarWidth));
+                            if (initialCollapsed) {
+                                drawer.classList.add('collapsed');
+                                document.body.classList.add('sidebar-collapsed');
+                                updateLayoutForSidebar(0);
+                            } else {
+                                drawer.style.width = savedSidebarWidth + 'px';
+                                document.body.classList.remove('sidebar-collapsed');
+                                updateLayoutForSidebar(parseInt(savedSidebarWidth));
+                            }
                             obs.disconnect();
                         }
                     });
                     drawerObserver.observe(document.body, { childList: true, subtree: true });
+                }
+            } else {
+                // No saved width; still apply collapsed or default width to layout
+                if (initialCollapsed) {
+                    document.body.classList.add('sidebar-collapsed');
+                    updateLayoutForSidebar(0);
+                } else {
+                    document.body.classList.remove('sidebar-collapsed');
+                    updateLayoutForSidebar(260);
                 }
             }
             
