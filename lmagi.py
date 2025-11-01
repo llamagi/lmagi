@@ -81,9 +81,23 @@ def main():
     def select_api(service):
         global selected_api
         selected_api = service
-        openmind.select_model(service)
+        # Schedule async model selection
+        try:
+            openmind._create_task(openmind.select_model(service))
+        except Exception:
+            pass
         ui.notify(f'Selected API: {service}', type='info')
         logging.info(f'Selected API: {service}')
+
+    # Auto-select first available API if none chosen
+    def auto_select_api():
+        services_priority = ['openai', 'groq', 'together', 'ai71']
+        if not selected_api:
+            for svc in services_priority:
+                key = openmind.api_manager.get_api_key(svc)
+                if key:
+                    select_api(svc)
+                    break
 
     # configure HTML head content from html_head.py; seed localStorage from server settings to avoid flash
     add_head_html(ui, settings_manager.sync_to_localStorage())
@@ -201,6 +215,8 @@ def main():
             ''')
     
     ui.timer(0.1, init_settings_from_storage, once=True)
+    # Attempt auto-select after initial settings load
+    ui.timer(0.2, auto_select_api, once=True)
 
     # Model selector moved to footer menu (removed FAB from content area)
 
@@ -484,6 +500,13 @@ def ollama_page():
     # Now that the menu exists, populate it
     list_ollama_models()
     update_ollama_menu()
+    # Auto-select first available Ollama model if present
+    try:
+        if (not selected_model) and ollama_models and len(ollama_models) > 1:
+            first_model = ollama_models[1].split()[0]
+            select_ollama_model(first_model)
+    except Exception:
+        pass
 
 
 @ui.page('/settings')
