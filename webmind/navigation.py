@@ -113,9 +113,9 @@ class SideNav:
         """Create drawer navigation item"""
         is_active = self.current_page == page_id
 
-        with ui.item(clickable=True).classes('cursor-pointer' + (' bg-blue-200' if is_active else '')):
+        with ui.item(on_click=lambda t=target: ui.navigate.to(t)).props('clickable').classes('cursor-pointer' + (' bg-blue-200' if is_active else '')):
             with ui.item_section():
-                ui.link(label, target=target).classes(
+                ui.label(label).classes(
                     'text-blue-800 font-bold' if is_active else 'text-blue-600'
                 )
 
