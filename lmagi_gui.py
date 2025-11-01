@@ -513,7 +513,17 @@ class LmagiGUI(QMainWindow):
             try:
                 logger.info("Starting lmagi backend server...")
                 # Activate virtual environment and run lmagi.py
-                venv_python = os.path.join(os.path.dirname(__file__), 'venv', 'bin', 'python')
+                # Cross-platform venv path detection
+                if sys.platform == 'win32':
+                    venv_python = os.path.join(os.path.dirname(__file__), 'venv', 'Scripts', 'python.exe')
+                else:
+                    venv_python = os.path.join(os.path.dirname(__file__), 'venv', 'bin', 'python')
+                
+                # Fallback to system python if venv doesn't exist
+                if not os.path.exists(venv_python):
+                    logger.warning(f"Venv python not found at {venv_python}, trying system python")
+                    venv_python = sys.executable
+                
                 lmagi_script = os.path.join(os.path.dirname(__file__), 'lmagi.py')
 
                 # Set environment to prevent browser auto-open
