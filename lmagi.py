@@ -217,6 +217,11 @@ def main():
     ui.timer(0.1, init_settings_from_storage, once=True)
     # Attempt auto-select after initial settings load
     ui.timer(0.2, auto_select_api, once=True)
+    # Ensure AGI is initialized from stored keys on page load
+    try:
+        openmind._create_task(openmind.initialize_agi())
+    except Exception:
+        pass
 
     # Model selector moved to footer menu (removed FAB from content area)
 
@@ -496,7 +501,18 @@ def ollama_page():
             else:
                 ui.menu_item('No models found').props('disable')
 
-    # Populate models after UI is built (menu is created in footer below)
+    # Consolidated refresh that runs after UI is built
+    def refresh_ollama_models():
+        try:
+            list_ollama_models()
+            update_ollama_menu()
+            if (not selected_model) and ollama_models and len(ollama_models) > 1:
+                first_model = ollama_models[1].split()[0]
+                select_ollama_model(first_model)
+        except Exception:
+            pass
+    # Defer refresh to ensure menu container exists
+    ui.timer(0.05, refresh_ollama_models, once=True)
 
     # Chat display area for Ollama responses
     with ui.column().classes('page-content'):
