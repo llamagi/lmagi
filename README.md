@@ -1,5 +1,6 @@
 # <a href="https://rage.pythai.net/introducing-kuntai-deepdive/">lmagi</a> thinking machine<br />
 # local model Augmented Generative Intelligence
+# ollama models are recognized in the ollama tab
 
 ![lmAGI](./gfx/llamagi.jpg)
 <a href="https://github.com/easyAGI/fastAGI/blob/main/automind/display_helpers.py">display helpers</a><br /> 
