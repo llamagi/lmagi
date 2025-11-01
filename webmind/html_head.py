@@ -9,6 +9,30 @@ def add_head_html(ui, server_settings=None):
     # This ensures theme colors are available immediately, preventing white flash
     ui.add_head_html('<link rel="stylesheet" href="/gfx/easystyle.css">')
     
+    # Themed toast notifications (match active theme via CSS variables)
+    ui.add_head_html('''
+    <style id="toast-theme">
+      .q-notification.theme-toast {
+        background-color: var(--bg-1) !important;
+        color: var(--fg-0) !important;
+        border: 1px solid var(--accent-blue) !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,.35) !important;
+        backdrop-filter: saturate(120%) blur(2px);
+      }
+      .q-notification.theme-toast .q-notification__avatar i,
+      .q-notification.theme-toast .q-notification__message {
+        color: inherit !important;
+      }
+      .q-notification.theme-toast .q-notification__actions .q-btn {
+        color: var(--fg-0) !important;
+      }
+      .q-notification.theme-toast.bg-positive { border-color: var(--accent-green) !important; }
+      .q-notification.theme-toast.bg-negative { border-color: var(--accent-red) !important; }
+      .q-notification.theme-toast.bg-warning { border-color: var(--accent-yellow) !important; }
+      .q-notification.theme-toast.bg-info { border-color: var(--terminal-blue) !important; }
+    </style>
+    ''')
+    
     # NEW: Seed localStorage from server settings BEFORE blocking theme init
     if server_settings:
         try:
@@ -507,6 +531,29 @@ def add_head_html(ui, server_settings=None):
                 if (window.updateThemeStyle) {
                     window.updateThemeStyle(theme);
                 }
+                // Ensure toast defaults remain applied after theme changes
+                if (window.__applyToastDefaults) {
+                    window.__applyToastDefaults();
+                }
+            };
+            
+            // Configure Quasar Notify defaults for themed toasts in top-right
+            window.__applyToastDefaults = function() {
+                function apply() {
+                    if (window.Quasar && window.Quasar.Notify) {
+                        try {
+                            window.Quasar.Notify.setDefaults({
+                                position: 'top-right',
+                                timeout: 3500,
+                                progress: true,
+                                classes: 'theme-toast'
+                            });
+                        } catch (e) {}
+                    } else {
+                        setTimeout(apply, 50);
+                    }
+                }
+                apply();
             };
         })();
     </script>
