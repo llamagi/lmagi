@@ -21,6 +21,7 @@ import concurrent.futures
 import ujson as json
 import asyncio
 import aiohttp
+import httpx
 import logging
 import signal
 import sys
@@ -36,7 +37,12 @@ app.mount('/gfx', StaticFiles(directory='gfx'), name='gfx')
 settings_manager = SettingsManager()
 
 openmind = OpenMind()  # initialize OpenMind instance
-ollama_model = OllamaHandler()  # initialize OllamaHandler instance
+# Initialize OllamaHandler with settings
+try:
+    ollama_url = settings_manager.get('ollama_base_url', 'http://localhost:11434')
+    ollama_model = OllamaHandler(base_url=ollama_url)
+except:
+    ollama_model = OllamaHandler()  # Fallback to default
 
 # Toggle for autonomous reasoning
 async def toggle_autonomous_reasoning(value):
@@ -91,7 +97,7 @@ def main():
 
     # Auto-select first available API if none chosen
     def auto_select_api():
-        services_priority = ['openai', 'groq', 'together', 'ai71']
+        services_priority = ['openai', 'groq', 'together', 'ai71', 'ollama_cloud']
         if not selected_api:
             for svc in services_priority:
                 key = openmind.api_manager.get_api_key(svc)
@@ -238,17 +244,92 @@ def main():
             ui.label('>').classes('terminal-prefix')
             text = ui.textarea(placeholder='Type your prompt (Enter=send, Shift+Enter=newline)').props('rows=1 autogrow').classes('prompt-input')
             ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
-            # API model selector button with dropdown menu
+            # API model selector button with dropdown menu (same pattern as Ollama page)
             with ui.button(icon='psychology').props('round flat').classes('q-ml-sm'):
-                with ui.menu().props('anchor="top right"'):
+                with ui.menu().props('anchor="top right"') as api_menu:
                     ui.menu_item('Model Selection').props('disable')
                     ui.separator()
-                    keys_list = openmind.api_manager.api_keys.items()
+                    api_menu_items_container = ui.column()
+            
+            def select_ollama_cloud_model(model_name):
+                """Select a specific Ollama Cloud model"""
+                global selected_api
+                selected_api = 'ollama_cloud'
+                try:
+                    from webmind.settings import SettingsManager
+                    settings = SettingsManager()
+                    base_url = settings.get('ollama_cloud_base_url', 'https://ollama.com')
+                    from webmind.chatter import OllamaCloudModel
+                    ollama_cloud_key = openmind.api_manager.get_api_key('ollama_cloud')
+                    if ollama_cloud_key:
+                        # Update the AGI instance
+                        openmind._create_task(openmind.select_model('ollama_cloud'))
+                        # Set the model on the instance - chatter is stored in agi_instance.agi.chatter
+                        if hasattr(openmind, 'agi_instance') and openmind.agi_instance:
+                            if hasattr(openmind.agi_instance, 'agi') and hasattr(openmind.agi_instance.agi, 'chatter'):
+                                if hasattr(openmind.agi_instance.agi.chatter, 'set_model'):
+                                    openmind.agi_instance.agi.chatter.set_model(model_name)
+                        ui.notify(f'Selected Ollama Cloud model: {model_name}', type='info')
+                        logging.info(f'Selected Ollama Cloud model: {model_name}')
+                except Exception as e:
+                    logging.error(f"Error selecting Ollama Cloud model: {e}", exc_info=True)
+                    ui.notify(f'Error selecting model: {str(e)}', type='negative')
+            
+            def update_api_menu():
+                """Populate the menu with available providers and their models (same pattern as Ollama page)"""
+                api_menu_items_container.clear()
+                with api_menu_items_container:
+                    keys_list = list(openmind.api_manager.api_keys.items())
+                    
+                    # Handle Ollama Cloud separately to show models
+                    ollama_cloud_key = openmind.api_manager.get_api_key('ollama_cloud')
+                    if ollama_cloud_key:
+                        try:
+                            from webmind.settings import SettingsManager
+                            settings = SettingsManager()
+                            base_url = settings.get('ollama_cloud_base_url', 'https://ollama.com')
+                            logging.info(f"Loading Ollama Cloud models with base_url: {base_url}")
+                            if not base_url or not base_url.strip():
+                                logging.warning("Ollama Cloud base_url is empty, using default")
+                                base_url = 'https://ollama.com'
+                            from webmind.chatter import OllamaCloudModel
+                            cloud_model = OllamaCloudModel(ollama_cloud_key, base_url=base_url)
+                            models = cloud_model.list_models()
+                            
+                            ui.menu_item('Ollama Cloud').props('disable')
+                            if models:
+                                logging.info(f"Displaying {len(models)} Ollama Cloud models in menu")
+                                for model_name in models:
+                                    # Use same pattern as Ollama page - lambda with default parameter
+                                    ui.menu_item(model_name, on_click=lambda m=model_name: select_ollama_cloud_model(m))
+                            else:
+                                logging.warning("No Ollama Cloud models found")
+                                ui.menu_item('No models available').props('disable')
+                            ui.separator()
+                        except Exception as e:
+                            logging.error(f"Error loading Ollama Cloud models: {e}", exc_info=True)
+                            ui.menu_item('Ollama Cloud (Error)').props('disable')
+                            ui.separator()
+                    
+                    # Handle other providers
                     for service, key in keys_list:
-                        def create_model_menu_footer(service):
-                            with ui.menu_item(clickable=True, on_click=lambda s=service: select_api(s)):
-                                ui.label(service.capitalize()).classes('font-bold')
-                        create_model_menu_footer(service)
+                        if service == 'ollama_cloud':
+                            continue  # Already handled above
+                        # Use same pattern - lambda with default parameter
+                        ui.menu_item(service.capitalize(), on_click=lambda s=service: select_api(s))
+            
+            # Consolidated refresh that runs after UI is built (same pattern as Ollama page)
+            def refresh_api_menu():
+                try:
+                    update_api_menu()
+                except Exception as e:
+                    logging.error(f"Error refreshing API menu: {e}", exc_info=True)
+            
+            # Defer refresh to ensure menu container exists
+            ui.timer(0.1, refresh_api_menu, once=True)
+            
+            # Store refresh function for later use
+            openmind.refresh_api_menu = refresh_api_menu
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
     # Install Enter/Shift+Enter handler on prompt
     ui.timer(0.05, lambda: ui.run_javascript('''
@@ -665,7 +746,8 @@ def settings_page():
     
     ui.timer(0.1, init_settings_from_storage, once=True)
 
-    with ui.column().classes('w-full max-w-screen-md mx-auto gap-4 p-4'):
+    # Settings container with scrollbar
+    with ui.column().classes('w-full max-w-screen-md mx-auto gap-4 p-4').style('max-height: calc(100vh - 120px); overflow-y: auto;'):
         ui.label('Settings').classes('text-2xl font-bold')
 
         # Appearance Card
@@ -726,14 +808,261 @@ def settings_page():
         with ui.card().classes('w-full'):
             ui.label('API Keys').classes('text-lg font-semibold')
             ui.separator()
+            
+            # API Provider dropdown
+            api_providers = {
+                'openai': 'OpenAI',
+                'groq': 'Groq',
+                'together': 'Together AI',
+                'ai71': 'AI71',
+                'ollama_cloud': 'Ollama Cloud'
+            }
+            
             with ui.row().classes('items-center w-full gap-2'):
-                openmind.service_input = ui.input('Service (e.g., together, openai, groq)').classes('flex-1 input')
-                openmind.key_input = ui.input('API Key').classes('flex-1 input')
+                openmind.service_input = ui.select(
+                    options=api_providers,
+                    label='Service',
+                    value='openai'
+                ).classes('flex-1 input').props('outlined')
+                openmind.key_input = ui.input('API Key').classes('flex-1 input').props('password')
             with ui.row().classes('gap-2'):
                 ui.button('Add API Key', on_click=openmind.add_api_key, icon='add').classes('api-action')
                 ui.button('List API Keys', on_click=openmind.list_api_keys, icon='list').classes('api-action')
             keys_container = ui.column().classes('w-full')
             openmind.keys_container = keys_container
+        
+        # Ollama Configuration Card
+        with ui.card().classes('w-full'):
+            ui.label('Ollama Configuration').classes('text-lg font-semibold')
+            ui.separator()
+            
+            # Base URL input
+            ollama_url_input = ui.input(
+                'Ollama Base URL',
+                value=settings_manager.get('ollama_base_url', 'http://localhost:11434'),
+                placeholder='http://localhost:11434'
+            ).classes('w-full input').props('outlined')
+            
+            ui.label('Configure the base URL for your Ollama instance. Can be localhost or another computer on the network.').classes('text-sm text-gray-500 q-mt-2')
+            
+            async def save_ollama_url():
+                base_url = ollama_url_input.value.strip()
+                if not base_url:
+                    ui.notify('Please enter a valid Ollama base URL', type='warning')
+                    return
+                
+                # Validate URL format
+                if not (base_url.startswith('http://') or base_url.startswith('https://')):
+                    ui.notify('URL must start with http:// or https://', type='warning')
+                    return
+                
+                # Save to settings
+                settings_manager.set('ollama_base_url', base_url)
+                
+                # Update OllamaHandler instances
+                ollama_model.update_base_url(base_url)
+                openmind.ollama_handler.update_base_url(base_url)
+                
+                # Test connection and reload models
+                ui.notify('Testing Ollama connection and reloading models...', type='info')
+                try:
+                    import httpx
+                    test_url = base_url.rstrip('/')
+                    if test_url.endswith('/api'):
+                        test_url = test_url[:-4]
+                    response = httpx.get(f'{test_url}/api/tags', timeout=5.0)
+                    if response.status_code == 200:
+                        models_data = response.json()
+                        model_count = len(models_data.get('models', []))
+                        ui.notify(f'Ollama connection successful! Found {model_count} model(s). URL saved.', type='positive')
+                        
+                        # Reload models in ollama_handler
+                        try:
+                            models = ollama_model.list_models()
+                            if models:
+                                logging.info(f"Ollama models reloaded: {len(models)} models found")
+                        except Exception as e:
+                            logging.warning(f"Could not reload models: {e}")
+                        
+                        # Update URL display
+                        url_status.text = ollama_model.base_url
+                    else:
+                        ui.notify(f'Ollama connection test returned status {response.status_code}', type='warning')
+                except Exception as e:
+                    ui.notify(f'Could not connect to Ollama: {str(e)}', type='negative')
+                    logging.warning(f'Ollama connection test failed: {e}')
+            
+            async def test_ollama_connection():
+                base_url = ollama_url_input.value.strip()
+                if not base_url:
+                    ui.notify('Please enter a URL first', type='warning')
+                    return
+                
+                ui.notify('Testing connection...', type='info')
+                try:
+                    import httpx
+                    test_url = base_url.rstrip('/')
+                    if test_url.endswith('/api'):
+                        test_url = test_url[:-4]
+                    
+                    # Temporarily update to test
+                    original_url = ollama_model.base_url
+                    ollama_model.update_base_url(base_url)
+                    
+                    response = httpx.get(f'{test_url}/api/tags', timeout=5.0)
+                    if response.status_code == 200:
+                        models_data = response.json()
+                        model_count = len(models_data.get('models', []))
+                        ui.notify(f'✓ Connection successful! Found {model_count} model(s)', type='positive')
+                        
+                        # Reload models
+                        try:
+                            models = ollama_model.list_models()
+                            if models:
+                                logging.info(f"Ollama models reloaded: {len(models)} models found")
+                        except Exception as e:
+                            logging.warning(f"Could not reload models: {e}")
+                    else:
+                        ui.notify(f'Connection test returned status {response.status_code}', type='warning')
+                        # Restore original URL if test failed
+                        ollama_model.update_base_url(original_url)
+                except httpx.ConnectError:
+                    ui.notify('Could not connect to Ollama. Check if Ollama is running and the URL is correct.', type='negative')
+                    # Restore original URL if test failed
+                    try:
+                        ollama_model.update_base_url(original_url)
+                    except:
+                        pass
+                except Exception as e:
+                    ui.notify(f'Connection test failed: {str(e)}', type='negative')
+                    # Restore original URL if test failed
+                    try:
+                        ollama_model.update_base_url(original_url)
+                    except:
+                        pass
+            
+            with ui.row().classes('gap-2 q-mt-4'):
+                ui.button('Save & Test Connection', on_click=save_ollama_url, icon='save').classes('api-action')
+                ui.button('Test Connection', on_click=test_ollama_connection, icon='network_check').classes('api-action')
+            
+            # Show current status
+            with ui.row().classes('items-center gap-2 q-mt-2'):
+                ui.label('Current URL:').classes('font-mono text-sm')
+                url_status = ui.label(ollama_model.base_url).classes('font-mono text-sm text-gray-600')
+            
+            async def update_url_display():
+                url_status.text = ollama_model.base_url
+            
+            ui.timer(0.1, update_url_display, once=True)
+        
+        # Ollama Cloud Configuration Card
+        with ui.card().classes('w-full'):
+            ui.label('Ollama Cloud Configuration').classes('text-lg font-semibold')
+            ui.separator()
+            
+            ui.label('Configure Ollama Cloud API access. Add your API key in the API Keys section above (service: ollama_cloud), then configure the base URL here.').classes('text-sm text-gray-500 q-mb-4')
+            
+            # Base URL input for Ollama Cloud
+            ollama_cloud_url_input = ui.input(
+                'Ollama Cloud Base URL',
+                value=settings_manager.get('ollama_cloud_base_url', 'https://ollama.com'),
+                placeholder='https://ollama.com'
+            ).classes('w-full input').props('outlined')
+            
+            async def save_ollama_cloud_url():
+                base_url = ollama_cloud_url_input.value.strip()
+                if not base_url:
+                    ui.notify('Please enter a valid Ollama Cloud base URL', type='warning')
+                    return
+                
+                # Validate URL format
+                if not (base_url.startswith('http://') or base_url.startswith('https://')):
+                    ui.notify('URL must start with http:// or https://', type='warning')
+                    return
+                
+                # Save to settings
+                settings_manager.set('ollama_cloud_base_url', base_url)
+                
+                # Test connection
+                ui.notify('Testing Ollama Cloud connection...', type='info')
+                ollama_cloud_key = openmind.api_manager.get_api_key('ollama_cloud')
+                if not ollama_cloud_key:
+                    ui.notify('Please add Ollama Cloud API key first in the API Keys section above', type='warning')
+                    return
+                
+                try:
+                    import httpx
+                    test_url = base_url.rstrip('/')
+                    if test_url.endswith('/api'):
+                        test_url = test_url[:-4]
+                    
+                    headers = {
+                        "Authorization": f"Bearer {ollama_cloud_key}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    response = httpx.get(f'{test_url}/api/tags', headers=headers, timeout=5.0)
+                    if response.status_code == 200:
+                        models_data = response.json()
+                        model_count = len(models_data.get('models', []))
+                        ui.notify(f'Ollama Cloud connection successful! Found {model_count} model(s). URL saved.', type='positive')
+                        
+                        # Update URL display
+                        cloud_url_status.text = base_url
+                    else:
+                        ui.notify(f'Ollama Cloud connection test returned status {response.status_code}', type='warning')
+                except Exception as e:
+                    ui.notify(f'Could not connect to Ollama Cloud: {str(e)}', type='negative')
+                    logging.warning(f'Ollama Cloud connection test failed: {e}')
+            
+            async def test_ollama_cloud_connection():
+                base_url = ollama_cloud_url_input.value.strip()
+                if not base_url:
+                    ui.notify('Please enter a URL first', type='warning')
+                    return
+                
+                ollama_cloud_key = openmind.api_manager.get_api_key('ollama_cloud')
+                if not ollama_cloud_key:
+                    ui.notify('Please add Ollama Cloud API key first in the API Keys section above', type='warning')
+                    return
+                
+                ui.notify('Testing connection...', type='info')
+                try:
+                    import httpx
+                    test_url = base_url.rstrip('/')
+                    if test_url.endswith('/api'):
+                        test_url = test_url[:-4]
+                    
+                    headers = {
+                        "Authorization": f"Bearer {ollama_cloud_key}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    response = httpx.get(f'{test_url}/api/tags', headers=headers, timeout=5.0)
+                    if response.status_code == 200:
+                        models_data = response.json()
+                        model_count = len(models_data.get('models', []))
+                        ui.notify(f'✓ Connection successful! Found {model_count} model(s)', type='positive')
+                    else:
+                        ui.notify(f'Connection test returned status {response.status_code}', type='warning')
+                except httpx.ConnectError:
+                    ui.notify('Could not connect to Ollama Cloud. Check the URL and API key.', type='negative')
+                except Exception as e:
+                    ui.notify(f'Connection test failed: {str(e)}', type='negative')
+            
+            with ui.row().classes('gap-2 q-mt-4'):
+                ui.button('Save & Test Connection', on_click=save_ollama_cloud_url, icon='save').classes('api-action')
+                ui.button('Test Connection', on_click=test_ollama_cloud_connection, icon='network_check').classes('api-action')
+            
+            # Show current status
+            with ui.row().classes('items-center gap-2 q-mt-2'):
+                ui.label('Current URL:').classes('font-mono text-sm')
+                cloud_url_status = ui.label(settings_manager.get('ollama_cloud_base_url', 'https://ollama.com')).classes('font-mono text-sm text-gray-600')
+            
+            async def update_cloud_url_display():
+                cloud_url_status.text = settings_manager.get('ollama_cloud_base_url', 'https://ollama.com')
+            
+            ui.timer(0.1, update_cloud_url_display, once=True)
 
 @ui.page('/logs')
 def logs_page():

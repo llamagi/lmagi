@@ -22,7 +22,9 @@ class SettingsManager:
             'dark_mode': True,
             'autonomous_reasoning': False,
             'sidebar_width': 260,
-            'footer_height': 160
+            'footer_height': 160,
+            'ollama_base_url': 'http://localhost:11434',
+            'ollama_cloud_base_url': 'https://ollama.com'
         }
         
         # Load settings

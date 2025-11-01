@@ -17,7 +17,7 @@ from nicegui import ui  # importing ui for easyAGI
 from memory.memory import create_memory_folders, store_in_stm, save_conversation_memory, save_internal_reasoning, DialogEntry, save_valid_truth
 from webmind.ollama_handler import OllamaHandler  # Import OllamaHandler for modular Ollama interactions
 from automind.automind import FundamentalAGI
-from webmind.chatter import GPT4o, GroqModel, TogetherModel, AI71Model, OllamaModel
+from webmind.chatter import GPT4o, GroqModel, TogetherModel, AI71Model, OllamaModel, OllamaCloudModel
 from webmind.api import APIManager
 import ujson as json
 import asyncio
@@ -33,7 +33,14 @@ class OpenMind:
         self.agi_instance = None
         self.initialize_memory()
         self.message_container = ui.column()
-        self.ollama_handler = OllamaHandler()  # initialize OllamaHandler instance
+        # Initialize OllamaHandler with settings
+        try:
+            from webmind.settings import SettingsManager
+            settings = SettingsManager()
+            ollama_url = settings.get('ollama_base_url', 'http://localhost:11434')
+            self.ollama_handler = OllamaHandler(base_url=ollama_url)
+        except:
+            self.ollama_handler = OllamaHandler()  # Fallback to default
         self.internal_queue = asyncio.Queue()
         self.prompt = ""  # Initialize an empty prompt field
         self.keys_container = ui.column()  # initialize keys_container
@@ -81,7 +88,7 @@ class OpenMind:
         logging.info(f'Using API key for {service}')
 
     def add_api_key(self):
-        service = self.service_input.value.strip()
+        service = str(self.service_input.value).strip() if self.service_input.value else ''
         api_key = self.key_input.value.strip()
         logging.debug(f"Adding API key for {service}: {api_key[:4]}...{api_key[-4:]}")
         if service and api_key:
@@ -90,8 +97,15 @@ class OpenMind:
             self._create_task(self.initialize_agi())
             if self.message_container.client.connected:
                 ui.notify(f'API key for {service} added and loaded successfully')
-            self.service_input.value = ''
+            # Reset inputs
+            self.service_input.value = None  # Clear select dropdown
             self.key_input.value = ''
+            # Refresh API menu if it exists
+            if hasattr(self, 'refresh_api_menu'):
+                try:
+                    self.refresh_api_menu()
+                except Exception:
+                    pass
             ui.run_javascript('setTimeout(() => { window.location.href = "/"; }, 1000);')
         else:
             ui.notify('Provide both service name and API key')
@@ -185,6 +199,24 @@ class OpenMind:
             else:
                 log_and_notify('AI71 API key not found. Please add the key first.', 'warning', 'negative')
 
+        if model_name == 'ollama_cloud' and not model_initialized:
+            ollama_cloud_key = self.api_manager.get_api_key('ollama_cloud')
+            if ollama_cloud_key:
+                # Get base URL from settings
+                try:
+                    from webmind.settings import SettingsManager
+                    settings = SettingsManager()
+                    base_url = settings.get('ollama_cloud_base_url', 'https://ollama.com')
+                except:
+                    base_url = 'https://ollama.com'
+                
+                chatter = OllamaCloudModel(ollama_cloud_key, base_url=base_url)
+                self.agi_instance = FundamentalAGI(chatter)
+                log_and_notify('Using Ollama Cloud for AGI')
+                model_initialized = True
+            else:
+                log_and_notify('Ollama Cloud API key not found. Please add the key first.', 'warning', 'negative')
+
         if not model_initialized:
             log_and_notify(f'Failed to initialize AGI with {model_name}', 'warning', 'negative')
 
@@ -193,6 +225,7 @@ class OpenMind:
         groq_key = self.api_manager.get_api_key('groq')
         together_key = self.api_manager.get_api_key('together')
         ai71_key = self.api_manager.get_api_key('ai71')
+        ollama_cloud_key = self.api_manager.get_api_key('ollama_cloud')
         llama_running = self.check_llama_running()
 
         if openai_key:
@@ -223,6 +256,21 @@ class OpenMind:
                 with self.message_container:
                     ui.notify('Using AI71 for ezAGI')
             logging.debug("AGI initialized with AI71")
+        elif ollama_cloud_key:
+            # Get base URL from settings
+            try:
+                from webmind.settings import SettingsManager
+                settings = SettingsManager()
+                base_url = settings.get('ollama_cloud_base_url', 'https://api.ollama.com')
+            except:
+                base_url = 'https://api.ollama.com'
+            
+            chatter = OllamaCloudModel(ollama_cloud_key, base_url=base_url)
+            self.agi_instance = FundamentalAGI(chatter)
+            if self.message_container.client.connected:
+                with self.message_container:
+                    ui.notify('Using Ollama Cloud for ezAGI')
+            logging.debug("AGI initialized with Ollama Cloud")
         elif llama_running:
             # Call ollama_handler to list models when LLaMA is found running
             models = self.ollama_handler.list_models()
@@ -261,11 +309,13 @@ class OpenMind:
 
     def check_llama_running(self):
         try:
-            response = httpx.get('http://localhost:11434')
+            # Use the configured Ollama base URL
+            base_url = self.ollama_handler.base_url
+            response = httpx.get(f'{base_url}/api/tags', timeout=2.0)
             if response.status_code == 200:
                 return True
         except httpx.RequestError as e:
-            logging.debug(f"LLaMA connection failed: {e}")
+            logging.debug(f"Ollama connection failed: {e}")
         return False
 
     async def get_conclusion_from_agi(self, prompt):
@@ -300,8 +350,9 @@ class OpenMind:
                 groq_key = self.api_manager.get_api_key('groq')
                 together_key = self.api_manager.get_api_key('together')
                 ai71_key = self.api_manager.get_api_key('ai71')
+                ollama_cloud_key = self.api_manager.get_api_key('ollama_cloud')
                 llama_running = self.check_llama_running()
-                if openai_key or groq_key or together_key or ai71_key or llama_running:
+                if openai_key or groq_key or together_key or ai71_key or ollama_cloud_key or llama_running:
                     await self.initialize_agi()
                 else:
                     if not self.initialization_warning_shown:

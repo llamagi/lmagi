@@ -1,0 +1,9 @@
+{
+  "theme": "everforest",
+  "dark_mode": true,
+  "autonomous_reasoning": false,
+  "sidebar_width": 260,
+  "footer_height": 160,
+  "ollama_base_url": "http://localhost:11434",
+  "ollama_cloud_base_url": "https://ollama.com"
+}
