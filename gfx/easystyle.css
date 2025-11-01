@@ -135,13 +135,14 @@ body.body--dark .input:focus {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 90%;
-    max-width: 2xl;
-    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
     flex-grow: 1;
     flex-basis: 0;
     border: 0px solid transparent;
     background-color: rgba(255, 255, 255, 0.6);
+    box-sizing: border-box;
 }
 body.body--dark .footer {
     background-color: rgba(255, 255, 255, 0.06);
@@ -243,6 +244,23 @@ body.body--dark .left-drawer {
     display: flex;
     flex-direction: column;
     height: 100%;
+}
+/* Shift content/footer to not overlap drawer */
+.page-content {
+    padding: 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-left: 260px; /* match drawer width */
+    box-sizing: border-box;
+}
+.terminal-footer {
+    border-top: 1px solid rgba(99, 102, 241, 0.3);
+    backdrop-filter: blur(6px);
+    padding-left: 260px; /* match drawer width */
+}
+@media (max-width: 1023px) {
+    .page-content { padding-left: 0; }
+    .terminal-footer { padding-left: 0; }
 }
 
 

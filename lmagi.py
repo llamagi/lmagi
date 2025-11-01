@@ -317,10 +317,12 @@ def ollama_page():
     list_ollama_models()
     update_ollama_menu()
 
-    # footer as input field and with external markdown link
-    with ui.footer().classes('footer'), ui.column().classes('footer'):
-        with ui.row().classes('w-full no-wrap items-center'):
-            text = ui.input(placeholder='Enter text here').classes('input').on('keydown.enter', send)  # input field with enter key event
+    # terminal-style footer for ollama too
+    with ui.footer().classes('footer terminal-footer'):
+        with ui.row().classes('w-full items-center gap-2'):
+            ui.label('>').classes('terminal-prefix')
+            text = ui.textarea(placeholder='Type your prompt, press Enter to send...').props('rows=1 autogrow').classes('prompt-input')
+            ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
     response_output_ollama = ui.markdown().classes('text-lg mt-4')
