@@ -9,6 +9,26 @@ def add_head_html(ui, server_settings=None):
     # This ensures theme colors are available immediately, preventing white flash
     ui.add_head_html('<link rel="stylesheet" href="/gfx/easystyle.css">')
     
+    # Ensure Quasar Notify uses top-right by default from the very start
+    ui.add_head_html('''
+    <script>
+      window.quasarConfig = window.quasarConfig || {};
+      window.quasarConfig.notify = Object.assign({}, window.quasarConfig.notify || {}, {
+        position: 'top-right',
+        timeout: 3500,
+        progress: true,
+        classes: 'theme-toast'
+      });
+    </script>
+    ''')
+    # Raise notifications above footer and offset from header
+    ui.add_head_html('''
+    <style id="toast-position-override">
+      .q-notifications { z-index: 11000 !important; }
+      .q-notifications__list { padding-top: 64px; }
+    </style>
+    ''')
+    
     # Themed toast notifications (match active theme via CSS variables)
     ui.add_head_html('''
     <style id="toast-theme">
@@ -310,6 +330,11 @@ def add_head_html(ui, server_settings=None):
                     
                     // Re-enable rendering
                     document.documentElement.style.display = '';
+                    // Remove server critical CSS now that live theme is applied
+                    try {
+                        const srv = document.getElementById('server-theme-critical');
+                        if (srv && srv.parentNode) srv.parentNode.removeChild(srv);
+                    } catch (e) {}
                     
                     return savedTheme;
                 } catch(e) {
@@ -449,6 +474,12 @@ def add_head_html(ui, server_settings=None):
                         // Disconnect after initial render to avoid performance issues
                         setTimeout(function() { niceGUIObserver.disconnect(); }, 3000);
                     }
+                    
+                    // Ensure temporary server critical CSS is removed so it does not override
+                    try {
+                        const srv = document.getElementById('server-theme-critical');
+                        if (srv && srv.parentNode) srv.parentNode.removeChild(srv);
+                    } catch (e) {}
                 }
             };
             
@@ -535,6 +566,9 @@ def add_head_html(ui, server_settings=None):
                 if (window.__applyToastDefaults) {
                     window.__applyToastDefaults();
                 }
+                if (window.__forceTopRightToasts) {
+                    window.__forceTopRightToasts();
+                }
             };
             
             // Configure Quasar Notify defaults for themed toasts in top-right
@@ -549,6 +583,29 @@ def add_head_html(ui, server_settings=None):
                                 classes: 'theme-toast'
                             });
                         } catch (e) {}
+                    } else {
+                        setTimeout(apply, 50);
+                    }
+                }
+                apply();
+            };
+
+            // Force every toast to use top-right and theme class, regardless of caller options
+            window.__forceTopRightToasts = function() {
+                function apply() {
+                    if (window.Quasar && window.Quasar.Notify) {
+                        var N = window.Quasar.Notify;
+                        if (!N.__originalCreate) {
+                            try {
+                                N.__originalCreate = N.create.bind(N);
+                                N.create = function(opts) {
+                                    opts = opts || {};
+                                    opts.position = 'top-right';
+                                    opts.classes = (opts.classes ? (opts.classes + ' ') : '') + 'theme-toast';
+                                    return N.__originalCreate(opts);
+                                };
+                            } catch (e) {}
+                        }
                     } else {
                         setTimeout(apply, 50);
                     }
