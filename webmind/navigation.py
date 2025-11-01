@@ -10,7 +10,7 @@ class Navigation:
     Provides consistent header navigation across all pages
     """
 
-    def __init__(self, current_page='main', dark_mode=None):
+    def __init__(self, current_page='main', dark_mode=None, drawer=None):
         """
         Initialize navigation component
 
@@ -20,6 +20,7 @@ class Navigation:
         """
         self.current_page = current_page
         self.dark_mode = dark_mode
+        self.drawer = drawer
 
     def create_header(self, autonomous_callback=None, dark_mode_callback=None, autonomous_state=None):
         """
@@ -30,8 +31,11 @@ class Navigation:
             dark_mode_callback: Callback for dark mode toggle
             autonomous_state: Current state of autonomous reasoning (True/False)
         """
-        with ui.header().classes('items-center justify-between bg-blue-600 text-white p-4'):
-            with ui.row().classes('items-center gap-4'):
+        with ui.header().classes('items-center justify-between bg-blue-600 text-white p-4 shadow-md'):
+            with ui.row().classes('items-center gap-3'):
+                # Optional drawer toggle for mobile
+                if self.drawer is not None:
+                    ui.button(icon='menu', on_click=self.drawer.toggle).props('flat round color=white')
                 # App logo/title
                 with ui.link(target='/'):
                     ui.label('🧠 lmagi').classes('text-2xl font-bold cursor-pointer')
@@ -41,7 +45,8 @@ class Navigation:
                     self._create_nav_button('Chat', '/', 'chat', 'chat')
                     self._create_nav_button('Ollama', '/ollama', 'ollama', 'psychology')
                     self._create_nav_button('Logs', '/#logs', 'logs', 'description')
-                    self._create_nav_button('API Keys', '/#api', 'api', 'vpn_key')
+                    # Settings page (includes API Keys)
+                    self._create_nav_button('Settings', '/settings', 'settings', 'settings')
 
             # Right side controls
             with ui.row().classes('items-center gap-2'):
@@ -54,13 +59,12 @@ class Navigation:
                         'color=white'
                     ).classes('text-sm')
 
-                # Dark mode toggle
+                # Dark mode toggle (icon-only)
                 if dark_mode_callback and self.dark_mode:
                     dark_mode_btn = ui.button(
-                        'Dark Mode' if not self.dark_mode.value else 'Light Mode',
                         on_click=lambda: self._toggle_dark_mode(dark_mode_btn, dark_mode_callback),
                         icon='dark_mode' if not self.dark_mode.value else 'light_mode'
-                    ).props('flat color=white')
+                    ).props('flat round color=white')
 
     def _create_nav_button(self, label, target, page_id, icon):
         """Create navigation button with active state"""

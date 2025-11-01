@@ -14,7 +14,7 @@ from nicegui import ui, app  # handle UIUX
 from fastapi.staticfiles import StaticFiles  # integrate fastapi static folder and gfx folder
 from webmind.ollama_handler import OllamaHandler  # Import OllamaHandler for modular Ollama interactions
 from webmind.html_head import add_head_html  # handler for the html head imports and meta tags
-from webmind.navigation import Navigation  # Unified navigation system
+from webmind.navigation import Navigation, SideNav  # Unified navigation system and drawer
 from automind.openmind import OpenMind  # Importing OpenMind class from openmind.py
 import concurrent.futures
 import ujson as json
@@ -85,15 +85,27 @@ def main():
     # configure HTML head content from html_head.py external module in the webmind folder
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    drawer = SideNav(current_page='chat').create_drawer()
     # Create reactive reference for autonomous reasoning state
     autonomous_state_ref = {'value': openmind.autonomous_reasoning}
 
     async def toggle_dark_mode():
         dark_mode.value = not dark_mode.value  # toggle dark mode value
+        # persist preference
+        await ui.run_javascript(
+            f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
+        )
         # update log button styles based on dark mode
         for button in log_buttons:
             button.classes(remove='light-log-buttons' if dark_mode.value else 'dark-log-buttons')
             button.classes(add='dark-log-buttons' if dark_mode.value else 'light-log-buttons')
+
+    async def init_theme_from_storage():
+        stored = await ui.run_javascript('localStorage.getItem("theme")')
+        if stored == 'dark':
+            dark_mode.value = True
+        elif stored == 'light':
+            dark_mode.value = False
 
     # Wrapper to sync reactive state with openmind.autonomous_reasoning
     async def autonomous_change_handler(value):
@@ -102,12 +114,15 @@ def main():
         await toggle_autonomous_reasoning(value)
 
     # Create unified navigation header
-    nav = Navigation(current_page='chat', dark_mode=dark_mode)
+    nav = Navigation(current_page='chat', dark_mode=dark_mode, drawer=drawer)
     nav.create_header(
         autonomous_callback=autonomous_change_handler,
         dark_mode_callback=toggle_dark_mode,
         autonomous_state=autonomous_state_ref['value']
     )
+
+    # initialize theme once UI is ready
+    ui.timer(0.1, init_theme_from_storage, once=True)
 
     # Model selector FAB (floating action button)
     with ui.page_sticky(position='top-left', x_offset=20, y_offset=80):
@@ -285,11 +300,22 @@ def ollama_page():
     # configure HTML head content from html_head.py external module in the webmind folder
     add_head_html(ui)
     dark_mode = ui.dark_mode()
+    drawer = SideNav(current_page='ollama').create_drawer()
     # Create reactive reference for autonomous reasoning state
     autonomous_state_ref = {'value': openmind.autonomous_reasoning}
 
     async def toggle_dark_mode():
         dark_mode.value = not dark_mode.value  # toggle dark mode value
+        await ui.run_javascript(
+            f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
+        )
+
+    async def init_theme_from_storage():
+        stored = await ui.run_javascript('localStorage.getItem("theme")')
+        if stored == 'dark':
+            dark_mode.value = True
+        elif stored == 'light':
+            dark_mode.value = False
 
     # Wrapper to sync reactive state with openmind.autonomous_reasoning
     async def autonomous_change_handler(value):
@@ -298,12 +324,14 @@ def ollama_page():
         await toggle_autonomous_reasoning(value)
 
     # Create unified navigation header
-    nav = Navigation(current_page='ollama', dark_mode=dark_mode)
+    nav = Navigation(current_page='ollama', dark_mode=dark_mode, drawer=drawer)
     nav.create_header(
         autonomous_callback=autonomous_change_handler,
         dark_mode_callback=toggle_dark_mode,
         autonomous_state=autonomous_state_ref['value']
     )
+
+    ui.timer(0.1, init_theme_from_storage, once=True)
 
     def select_ollama_model(model_name):
         """Handle model selection from FAB"""
@@ -343,6 +371,67 @@ def ollama_page():
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
     response_output_ollama = ui.markdown().classes('text-lg mt-4')
+
+
+@ui.page('/settings')
+def settings_page():
+    """Application settings: appearance and API keys"""
+    add_head_html(ui)
+    dark_mode = ui.dark_mode()
+    drawer = SideNav(current_page='settings').create_drawer()
+
+    async def init_theme_from_storage():
+        stored = await ui.run_javascript('localStorage.getItem("theme")')
+        if stored == 'dark':
+            dark_mode.value = True
+        elif stored == 'light':
+            dark_mode.value = False
+
+    async def on_theme_switch(e):
+        # set according to switch and persist
+        dark_mode.value = bool(e.value)
+        await ui.run_javascript(
+            f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
+        )
+
+    # Sync autonomous toggle with backend
+    autonomous_state_ref = {'value': openmind.autonomous_reasoning}
+
+    async def autonomous_change_handler(value):
+        autonomous_state_ref['value'] = value
+        openmind.autonomous_reasoning = value
+        await toggle_autonomous_reasoning(value)
+
+    nav = Navigation(current_page='settings', dark_mode=dark_mode, drawer=drawer)
+    nav.create_header(
+        autonomous_callback=autonomous_change_handler,
+        dark_mode_callback=lambda: None,  # theme is managed by the switch on this page
+        autonomous_state=autonomous_state_ref['value']
+    )
+
+    ui.timer(0.1, init_theme_from_storage, once=True)
+
+    with ui.column().classes('w-full max-w-screen-md mx-auto gap-4 p-4'):
+        ui.label('Settings').classes('text-2xl font-bold')
+
+        # Appearance Card
+        with ui.card().classes('w-full'):
+            ui.label('Appearance').classes('text-lg font-semibold')
+            ui.separator()
+            ui.switch('Dark Mode', value=dark_mode.value, on_change=on_theme_switch)
+
+        # API Keys Card
+        with ui.card().classes('w-full'):
+            ui.label('API Keys').classes('text-lg font-semibold')
+            ui.separator()
+            with ui.row().classes('items-center w-full gap-2'):
+                openmind.service_input = ui.input('Service (e.g., together, openai, groq)').classes('flex-1 input')
+                openmind.key_input = ui.input('API Key').classes('flex-1 input')
+            with ui.row().classes('gap-2'):
+                ui.button('Add API Key', on_click=openmind.add_api_key, icon='add').classes('api-action')
+                ui.button('List API Keys', on_click=openmind.list_api_keys, icon='list').classes('api-action')
+            keys_container = ui.column().classes('w-full')
+            openmind.keys_container = keys_container
 
 def signal_handler(sig, frame):
     """Handle graceful shutdown on SIGINT and SIGTERM"""
