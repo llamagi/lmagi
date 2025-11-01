@@ -1430,6 +1430,82 @@ def settings_page():
                         logging.error(f"Error saving timeout settings: {e}")
                 
                 ui.button('Save Timeout Settings', on_click=save_timeout_settings, icon='save').classes('api-action q-mt-4')
+            
+            # Data Management Card
+            with ui.card().classes('w-full'):
+                ui.label('Data Management').classes('text-lg font-semibold')
+                ui.separator()
+                
+                ui.label('Clear logs and data files to free up disk space. This will delete all runtime-generated files but preserve folder structure.').classes('text-sm text-gray-500 q-mb-4')
+                
+                async def clear_logs_handler():
+                    """Clear all log files"""
+                    result = settings_manager.clear_logs()
+                    if result['success']:
+                        if result['count'] > 0:
+                            ui.notify(f'Cleared {result["count"]} log file(s): {", ".join(result["cleared"])}', type='positive')
+                        else:
+                            ui.notify('No log files found to clear', type='info')
+                    else:
+                        error_msg = '; '.join(result['errors'])
+                        ui.notify(f'Errors clearing logs: {error_msg}', type='warning')
+                        logging.error(f"Error clearing logs: {result['errors']}")
+                
+                async def clear_mindx_handler():
+                    """Clear all mindx data files"""
+                    result = settings_manager.clear_mindx_data()
+                    if result['success']:
+                        if result['cleared'] > 0:
+                            ui.notify(f'Cleared {result["cleared"]} mindx data file(s)', type='positive')
+                        else:
+                            ui.notify('No mindx data files found to clear', type='info')
+                    else:
+                        error_msg = '; '.join(result['errors'])
+                        ui.notify(f'Errors clearing mindx data: {error_msg}', type='warning')
+                        logging.error(f"Error clearing mindx data: {result['errors']}")
+                
+                async def clear_memory_handler():
+                    """Clear all memory data files"""
+                    result = settings_manager.clear_memory_data()
+                    if result['success']:
+                        if result['total_files'] > 0:
+                            cleared_locations = ', '.join(result['cleared'])
+                            ui.notify(f'Cleared {result["total_files"]} memory file(s) from: {cleared_locations}', type='positive')
+                        else:
+                            ui.notify('No memory data files found to clear', type='info')
+                    else:
+                        error_msg = '; '.join(result['errors'])
+                        ui.notify(f'Errors clearing memory data: {error_msg}', type='warning')
+                        logging.error(f"Error clearing memory data: {result['errors']}")
+                
+                async def clear_all_handler():
+                    """Clear all logs and data files"""
+                    result = settings_manager.clear_all_data()
+                    if result['success']:
+                        total = result['total_cleared']
+                        if total > 0:
+                            message = f'Cleared {total} file(s) total:\n'
+                            message += f"  • Logs: {result['logs']['count']} file(s)\n"
+                            message += f"  • Mindx: {result['mindx']['cleared']} file(s)\n"
+                            message += f"  • Memory: {result['memory']['total_files']} file(s)"
+                            ui.notify(message, type='positive', timeout=5)
+                        else:
+                            ui.notify('No files found to clear', type='info')
+                    else:
+                        error_msg = '; '.join(result['errors'])
+                        ui.notify(f'Some errors occurred: {error_msg}', type='warning')
+                        logging.error(f"Errors clearing all data: {result['errors']}")
+                
+                with ui.column().classes('w-full gap-3'):
+                    with ui.row().classes('w-full gap-2'):
+                        ui.button('Clear Logs', on_click=clear_logs_handler, icon='description').classes('flex-1').props('color=orange')
+                        ui.button('Clear Mindx Data', on_click=clear_mindx_handler, icon='psychology').classes('flex-1').props('color=orange')
+                    
+                    with ui.row().classes('w-full gap-2'):
+                        ui.button('Clear Memory Data', on_click=clear_memory_handler, icon='memory').classes('flex-1').props('color=orange')
+                        ui.button('Clear All Data', on_click=clear_all_handler, icon='delete_sweep').classes('flex-1').props('color=red')
+                    
+                    ui.label('⚠️ Warning: These actions cannot be undone. Make sure to backup important data before clearing.').classes('text-xs text-orange-600 q-mt-2')
 
 @ui.page('/logs')
 def logs_page():
