@@ -31,7 +31,7 @@ class Navigation:
             dark_mode_callback: Callback for dark mode toggle
             autonomous_state: Current state of autonomous reasoning (True/False)
         """
-        with ui.header().classes('items-center justify-between bg-blue-600 text-white p-4 shadow-md'):
+        with ui.header().classes('app-header items-center justify-between q-px-md q-py-sm'):
             with ui.row().classes('items-center gap-3'):
                 # Optional drawer toggle for mobile
                 if self.drawer is not None:
@@ -93,19 +93,19 @@ class SideNav:
 
     def create_drawer(self):
         """Create side navigation drawer"""
-        with ui.left_drawer(fixed=False, bordered=True).classes('bg-blue-100') as drawer:
-            with ui.column().classes('w-full'):
-                ui.label('Navigation').classes('text-xl font-bold p-4')
+        with ui.left_drawer(fixed=True, bordered=False).props('width=260').classes('left-drawer') as drawer:
+            with ui.column().classes('drawer-content'):
+                ui.label('Navigation').classes('text-xl font-bold q-px-md q-pt-md')
                 ui.separator()
 
                 self._create_drawer_item('💬 Chat', '/', 'chat')
                 self._create_drawer_item('🤖 Ollama', '/ollama', 'ollama')
                 self._create_drawer_item('📊 Logs', '/#logs', 'logs')
-                self._create_drawer_item('🔑 API Keys', '/#api', 'api')
+                self._create_drawer_item('🔧 Settings', '/settings', 'settings')
 
                 ui.separator()
-                ui.label('About').classes('text-sm p-4 text-gray-600')
-                ui.markdown('[easyAGI Project](https://rage.pythai.net)').classes('p-4 text-sm')
+                ui.label('About').classes('text-sm q-px-md text-gray-600')
+                ui.markdown('[easyAGI Project](https://rage.pythai.net)').classes('q-px-md q-pb-md text-sm')
 
         return drawer
 
