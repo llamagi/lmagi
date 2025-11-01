@@ -38,7 +38,8 @@ class LmagiGUI(QMainWindow):
     def init_ui(self):
         """Initialize the user interface"""
         self.setWindowTitle('lmagi - easyAGI')
-        self.setGeometry(100, 100, 1400, 900)
+        # Larger default window size for better usability
+        self.setGeometry(100, 100, 1600, 1000)
 
         # Create central widget and layout
         central_widget = QWidget()

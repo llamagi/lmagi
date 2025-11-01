@@ -232,21 +232,30 @@ class OpenMind:
                 chatter = OllamaModel(model=first_model)
                 self.agi_instance = FundamentalAGI(chatter)
                 model_list = ", ".join([m.split()[0] for m in models[1:]])
-                if self.message_container.client.connected:
-                    with self.message_container:
-                        ui.notify(f'Using Ollama for ezAGI with model: {first_model}')
+                try:
+                    if self.message_container and hasattr(self.message_container, 'client') and self.message_container.client.connected:
+                        with self.message_container:
+                            ui.notify(f'Using Ollama for ezAGI with model: {first_model}')
+                except Exception:
+                    pass  # Client may have been deleted, ignore
                 logging.debug(f"AGI initialized with Ollama model: {first_model}. Available: {model_list}")
             else:
-                if self.message_container.client.connected:
-                    with self.message_container:
-                        ui.notify('LLaMA found running, but no models are available.')
+                try:
+                    if self.message_container and hasattr(self.message_container, 'client') and self.message_container.client.connected:
+                        with self.message_container:
+                            ui.notify('LLaMA found running, but no models are available.')
+                except Exception:
+                    pass  # Client may have been deleted, ignore
                 logging.debug("LLaMA running on localhost:11434, but no models are available")
         else:
             self.agi_instance = None
             if not self.initialization_warning_shown:
-                if self.message_container.client.connected:
-                    with self.message_container:
-                        ui.notify('No valid API key or LLaMA instance found. Please add an API key or start LLaMA')
+                try:
+                    if self.message_container and hasattr(self.message_container, 'client') and self.message_container.client.connected:
+                        with self.message_container:
+                            ui.notify('No valid API key or LLaMA instance found. Please add an API key or start LLaMA')
+                except Exception:
+                    pass  # Client may have been deleted, ignore
                 logging.debug("No valid API key or LLaMA instance found. AGI not initialized")
                 self.initialization_warning_shown = True
 
@@ -279,9 +288,12 @@ class OpenMind:
     async def reasoning_loop(self):
         """
         Internal reasoning loop for continuous AGI reasoning without user interaction
-        adding a prompt to AGI processesing its conclusion periodically
-        The conclusions are currently displayed in the response window and saved to ./memory/logs/thoughts.json including ./memory/logs/notpremise.json
+        Uses the last user prompt to continue reasoning about the same topic
+        The conclusions are displayed in the response window and saved to ./memory/logs/thoughts.json including ./memory/logs/notpremise.json
         """
+        last_conclusion = None  # Track last conclusion for autonomous continuation
+        last_prompt = None  # Track last prompt used
+        
         while True:
             if self.agi_instance is None:
                 openai_key = self.api_manager.get_api_key('openai')
@@ -294,20 +306,44 @@ class OpenMind:
                 else:
                     if not self.initialization_warning_shown:
                         logging.debug("Waiting for API key or LLaMA instance...")
-                        if self.message_container.client.connected:
-                            with self.message_container:
-                                ui.notify('AGI not initialized. Add an API key or start LLaMA.')
+                        try:
+                            if self.message_container and hasattr(self.message_container, 'client') and self.message_container.client.connected:
+                                with self.message_container:
+                                    ui.notify('AGI not initialized. Add an API key or start LLaMA.')
+                        except Exception:
+                            pass  # Client may have been deleted, ignore
                         self.initialization_warning_shown = True
                     await asyncio.sleep(30)  # Wait before checking again
                     continue
 
-            prompt = self.prompt  # Use the updated prompt from user input
+            # Autonomous reasoning: prioritize user's last prompt, then continue reasoning from last conclusion
+            if self.prompt and self.prompt.strip():
+                # User has provided a new prompt - use it and update tracking
+                prompt = self.prompt
+                last_prompt = prompt
+                last_conclusion = None  # Reset conclusion context since we have new prompt
+            elif last_prompt and last_conclusion:
+                # Continue reasoning about the same topic using last conclusion as context
+                prompt = f"Continuing from: {last_prompt}\n\nPrevious conclusion: {last_conclusion[:300]}...\n\nWhat deeper insights or related aspects can we explore?"
+            elif last_prompt:
+                # We have a prompt but no conclusion yet - re-examine the prompt
+                prompt = f"Re-examining: {last_prompt}\n\nWhat additional perspectives or implications should we consider?"
+            else:
+                # No user input yet - wait for user prompt before autonomous reasoning
+                logging.debug("No prompt available for autonomous reasoning. Waiting for user input...")
+                await asyncio.sleep(10)
+                continue
+            
             conclusion = await self.get_conclusion_from_agi(prompt)
+            last_conclusion = conclusion  # Store for next iteration
             self.display_internal_conclusion(conclusion)
             save_internal_reasoning({"timestamp": int(time.time()), "prompt": prompt, "conclusion": conclusion})
-            if self.message_container.client.connected:
-                with self.message_container:
-                    ui.notify('Reasoning loop conclusion saved')
+            try:
+                if self.message_container and hasattr(self.message_container, 'client') and self.message_container.client.connected:
+                    with self.message_container:
+                        ui.notify('Reasoning loop conclusion saved')
+            except Exception:
+                pass  # Client may have been deleted, ignore
 
             await asyncio.sleep(10)  # Adjust the delay as necessary
 
