@@ -396,3 +396,9 @@ INFO: Expression 'space and time are two fundamental concepts in physics, partic
 5. quantum gravity theories: in attempts to unify quantum mechanics (the theory governing small-scale phenomena) and general relativity (which includes einstein’s theories), physicists have proposed various models of quantum gravity that suggest even spacetime may not be as smooth and continuous as previously thought, but instead made up of discrete units or "quanta".
 
 in essence, space and time are deeply intertwined aspects of our universe. understanding them requires a shift from classical physics to modern theoretical frameworks like relativity theory or its extensions into the realm of quantum gravity.' is not a tautology.
+2025-10-31 22:16:00,510 - LogicTables - INFO - Added variable: A
+INFO: Added variable: A
+2025-10-31 22:16:00,511 - LogicTables - INFO - Added variable: B
+INFO: Added variable: B
+2025-10-31 22:16:00,511 - LogicTables - INFO - Added expression: A and B
+INFO: Added expression: A and B

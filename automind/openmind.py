@@ -211,6 +211,26 @@ class OpenMind:
                     base_url = 'https://ollama.com'
                 
                 chatter = OllamaCloudModel(ollama_cloud_key, base_url=base_url)
+                # Check if we should preserve an existing model selection
+                existing_model = None
+                if hasattr(self, 'agi_instance') and self.agi_instance:
+                    if hasattr(self.agi_instance, 'agi') and hasattr(self.agi_instance.agi, 'chatter'):
+                        existing_model = self.agi_instance.agi.chatter.get_current_model()
+                        if existing_model:
+                            logging.info(f"Preserving existing Ollama Cloud model: {existing_model}")
+                            chatter.set_model(existing_model)
+                
+                # Set a default model only if no existing model was preserved
+                if not existing_model:
+                    try:
+                        models = chatter.list_models()
+                        if models:
+                            # Use the first available model as default
+                            chatter.set_model(models[0])
+                            logging.info(f"Ollama Cloud initialized with default model: {models[0]}")
+                    except Exception as e:
+                        logging.warning(f"Could not set default Ollama Cloud model: {e}")
+                
                 self.agi_instance = FundamentalAGI(chatter)
                 log_and_notify('Using Ollama Cloud for AGI')
                 model_initialized = True
@@ -261,11 +281,26 @@ class OpenMind:
             try:
                 from webmind.settings import SettingsManager
                 settings = SettingsManager()
-                base_url = settings.get('ollama_cloud_base_url', 'https://api.ollama.com')
+                base_url = settings.get('ollama_cloud_base_url', 'https://ollama.com')
             except:
-                base_url = 'https://api.ollama.com'
+                base_url = 'https://ollama.com'
             
             chatter = OllamaCloudModel(ollama_cloud_key, base_url=base_url)
+            # Set a default model if available (try to get first available model)
+            # BUT only if no model is already set (to avoid overwriting user selection)
+            try:
+                models = chatter.list_models()
+                if models:
+                    # Check if we already have a model set (from user selection)
+                    current_model = chatter.get_current_model()
+                    if not current_model:
+                        # Use the first available model as default only if none selected
+                        chatter.set_model(models[0])
+                        logging.info(f"Ollama Cloud initialized with default model: {models[0]}")
+                    else:
+                        logging.info(f"Ollama Cloud initialized with existing model: {current_model}")
+            except Exception as e:
+                logging.warning(f"Could not set default Ollama Cloud model: {e}")
             self.agi_instance = FundamentalAGI(chatter)
             if self.message_container.client.connected:
                 with self.message_container:
@@ -405,10 +440,14 @@ class OpenMind:
         if conclusion != "No premises available for logic as conclusion.":
             if self.message_container.client.connected:
                 with self.message_container:
-                    response_message = ui.chat_message(name='intr', sent=False)
-                    response_message.clear()
-                    with response_message:
-                        ui.markdown(conclusion)
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    with ui.column().classes('message-block'):
+                        ui.label('intr').classes('text-lg font-semibold')
+                        ui.html('<hr style="margin: 0.5rem 0; border: none; border-top: 1px solid var(--accent-blue);">')
+                        ui.label(timestamp).classes('text-xs text-gray-500')
+                        ui.markdown(conclusion).classes('mt-2')
             logging.info(f"Internal reasoning conclusion: {conclusion}")
 
         # Determine which log file to write to
@@ -456,20 +495,38 @@ class OpenMind:
             save_conversation_memory({"dialog": {"instruction": prompt, "response": conclusion}})
 
     async def send_message(self, question):
+        response_container = None
+        spinner = None
+        
         if self.message_container.client.connected:
             with self.message_container:
-                ui.chat_message(text=question, name='query', sent=True)
-                response_message = ui.chat_message(name='ezAGI', sent=False)
+                # Format: name, horizontal rule, timestamp, message
+                from datetime import datetime
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                with ui.column().classes('message-block'):
+                    ui.label('query').classes('text-lg font-semibold')
+                    ui.html('<hr style="margin: 0.5rem 0; border: none; border-top: 1px solid var(--accent-blue);">')
+                    ui.label(timestamp).classes('text-xs text-gray-500')
+                    ui.markdown(question).classes('mt-2')
+                
+                response_container = ui.column().classes('message-block')
                 spinner = ui.spinner(type='dots')
 
         try:
             conclusion = await self.get_conclusion_from_agi(question)
-            if response_message and self.message_container.client.connected:
-                response_message.clear()
-                with response_message:
-                    ui.markdown(conclusion)
+            if response_container and self.message_container.client.connected:
+                response_container.clear()
+                with response_container:
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    ui.label('ezAGI').classes('text-lg font-semibold')
+                    ui.html('<hr style="margin: 0.5rem 0; border: none; border-top: 1px solid var(--accent-blue);">')
+                    ui.label(timestamp).classes('text-xs text-gray-500')
+                    ui.markdown(conclusion).classes('mt-2')
 
-            await self.run_javascript_with_retry('window.scrollTo(0, document.body.scrollHeight)', retries=3, timeout=30.1)
+            await self.run_javascript_with_retry('const c=document.querySelector(".chat-container"); if(c){c.scrollTop=c.scrollHeight;}', retries=3, timeout=30.1)
 
             # Store the dialog entry
             entry = DialogEntry(question, conclusion)
@@ -482,9 +539,9 @@ class OpenMind:
                 self.log.push(f"Error getting conclusion from easyAGI: {e}")
         finally:
             try:
-                if self.message_container.client.connected:
+                if spinner and self.message_container.client.connected:
                     self.message_container.remove(spinner)  # Correctly remove the spinner
-            except KeyError:
+            except (KeyError, AttributeError):
                 logging.warning("Spinner element not found in message_container")
 
     async def run_javascript_with_retry(self, script, retries=5, timeout=12.0):

@@ -67,7 +67,15 @@ class OllamaHandler:
         # Use HTTP API for listing models (works for both local and remote)
         try:
             import httpx
-            response = httpx.get(f'{self.api_url}/tags', timeout=10.0)
+            # Get timeout from settings
+            try:
+                from webmind.settings import SettingsManager
+                timeout_settings = SettingsManager()
+                ollama_timeout = timeout_settings.get('ollama_timeout', 10.0)
+            except:
+                ollama_timeout = 10.0
+            
+            response = httpx.get(f'{self.api_url}/tags', timeout=ollama_timeout)
             if response.status_code == 200:
                 data = response.json()
                 models = data.get('models', [])

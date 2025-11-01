@@ -124,7 +124,7 @@ class OllamaCloudModel:
         
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
-        self.current_model = "llama3"  # Default model
+        self.current_model = None  # No default - must be set explicitly
         logging.debug(f"OllamaCloudModel initialized with base_url: {self.base_url}, api_url: {self.api_url}")
     
     def set_model(self, model_name):
@@ -218,54 +218,70 @@ class OllamaCloudModel:
     async def generate_response_async(self, knowledge, model=None):
         if model is None:
             model = self.current_model
+        
+        if not model:
+            error_msg = "No model selected. Please select an Ollama Cloud model first."
+            logging.error(error_msg)
+            raise Exception(error_msg)
+        
+        import aiohttp
+        import ujson as json
+        
+        # Get timeout from settings
         try:
-            import aiohttp
-            import ujson as json
+            from webmind.settings import SettingsManager
+            timeout_settings = SettingsManager()
+            ollama_cloud_timeout = timeout_settings.get('ollama_cloud_timeout_non_streaming', 60)
+        except:
+            ollama_cloud_timeout = 60
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # Try chat endpoint first (preferred for cloud)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": knowledge}
+            ],
+            "stream": False
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            # Try chat endpoint first
+            try:
+                async with session.post(
+                    f"{self.api_url}/chat",
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=ollama_cloud_timeout)
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if "message" in data and "content" in data["message"]:
+                            return data["message"]["content"].lower()
+                        elif "response" in data:
+                            return data["response"].lower()
+                    else:
+                        error_text = await response.text()
+                        logging.debug(f"Ollama Cloud /api/chat returned status {response.status}: {error_text}")
+            except aiohttp.ClientError as e:
+                logging.debug(f"Ollama Cloud /api/chat ClientError: {e}")
             
-            # Use chat endpoint for better compatibility with cloud API
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            # Try chat endpoint first (preferred for cloud)
-            payload = {
+            # Fallback to generate endpoint
+            payload_generate = {
                 "model": model,
-                "messages": [
-                    {"role": "user", "content": knowledge}
-                ],
+                "prompt": knowledge,
                 "stream": False
             }
-            
-            async with aiohttp.ClientSession() as session:
-                try:
-                    async with session.post(
-                        f"{self.api_url}/chat",
-                        json=payload,
-                        headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=60)
-                    ) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            if "message" in data and "content" in data["message"]:
-                                return data["message"]["content"].lower()
-                            elif "response" in data:
-                                return data["response"].lower()
-                except aiohttp.ClientError:
-                    # Fallback to generate endpoint if chat endpoint not available
-                    pass
-                
-                # Fallback to generate endpoint
-                payload_generate = {
-                    "model": model,
-                    "prompt": knowledge,
-                    "stream": False
-                }
+            try:
                 async with session.post(
                     f"{self.api_url}/generate",
                     json=payload_generate,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=60)
+                    timeout=aiohttp.ClientTimeout(total=ollama_cloud_timeout)
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -273,29 +289,47 @@ class OllamaCloudModel:
                             return data["response"].lower()
                         elif "error" in data:
                             logging.error(f"Ollama Cloud error: {data['error']}")
-                            return f"error: {data['error']}"
+                            raise Exception(f"Ollama Cloud API error: {data['error']}")
                     else:
                         error_text = await response.text()
                         logging.error(f"Ollama Cloud API error: HTTP {response.status} - {error_text}")
-                        return f"error: Ollama Cloud API returned HTTP {response.status}"
-            
-            return "error: unable to generate a response from Ollama Cloud API."
-        except Exception as e:
-            error_msg = f"Ollama Cloud API error: {e}"
-            logging.error(error_msg, exc_info=True)
-            return "error: unable to generate a response due to an issue with the ollama cloud api."
+                        raise Exception(f"Ollama Cloud API returned HTTP {response.status}: {error_text}")
+            except aiohttp.ClientError as e:
+                logging.error(f"Ollama Cloud /api/generate ClientError: {e}")
+                raise Exception(f"Ollama Cloud API connection error: {str(e)}")
+        
+        raise Exception("Unable to generate response from Ollama Cloud API - both /api/chat and /api/generate failed")
 
 class OllamaModel:
-    def __init__(self, model="llama3"):
-        self.api_url = "http://localhost:11434/api"
-        self.current_model = model
-
+    """
+    Local Ollama API integration for local or network-based Ollama instances.
+    Uses the same API structure as Ollama Cloud but without authentication.
+    """
+    def __init__(self, model=None, base_url=None):
+        # Get base URL from settings if not provided
+        if base_url is None:
+            try:
+                from webmind.settings import SettingsManager
+                settings = SettingsManager()
+                base_url = settings.get('ollama_base_url', 'http://localhost:11434')
+            except:
+                base_url = 'http://localhost:11434'
+        
+        # Ensure base_url doesn't have trailing /api - we'll add it
+        base_url = base_url.rstrip('/')
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]
+        
+        self.base_url = base_url
+        self.api_url = f"{base_url}/api"
+        self.current_model = model  # No default - model must be selected explicitly (like OllamaCloudModel)
+    
     def set_model(self, model_name):
         self.current_model = model_name
-
+    
     def get_current_model(self):
         return self.current_model
-
+    
     def generate_response(self, knowledge):
         """
         Synchronous wrapper for generate_response_async.
@@ -321,6 +355,20 @@ class OllamaModel:
     async def generate_response_async(self, knowledge, model=None):
         if model is None:
             model = self.current_model
+        
+        if not model:
+            error_msg = "No model selected. Please select an Ollama model first."
+            logging.error(error_msg)
+            raise Exception(error_msg)
+        
+        # Get timeout from settings
+        try:
+            from webmind.settings import SettingsManager
+            timeout_settings = SettingsManager()
+            ollama_timeout = timeout_settings.get('ollama_timeout', 10)
+        except:
+            ollama_timeout = 10
+        
         try:
             import aiohttp
             import ujson as json
@@ -331,18 +379,27 @@ class OllamaModel:
                     "prompt": knowledge,
                     "stream": False  # Non-streaming for sync compatibility
                 }
-                async with session.post(f"{self.api_url}/generate", json=payload) as response:
-                    data = await response.json()
-                    if "response" in data:
-                        response_content = data["response"]
-                    elif "error" in data:
-                        logging.error(f"Ollama error: {data['error']}")
-                        return f"error: {data['error']}"
+                async with session.post(
+                    f"{self.api_url}/generate",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=ollama_timeout)
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if "response" in data:
+                            response_content = data["response"]
+                        elif "error" in data:
+                            logging.error(f"Ollama error: {data['error']}")
+                            raise Exception(f"Ollama API error: {data['error']}")
+                    else:
+                        error_text = await response.text()
+                        logging.error(f"Ollama API error: HTTP {response.status} - {error_text}")
+                        raise Exception(f"Ollama API returned HTTP {response.status}: {error_text}")
             return response_content.lower()
         except Exception as e:
             error_msg = f"Ollama API error: {e}"
             logging.error(error_msg, exc_info=True)
-            return "error: unable to generate a response due to an issue with the ollama api."
+            raise  # Re-raise to let retry decorator handle it
 
 def check_ollama_installation():
     command = "ollama list"

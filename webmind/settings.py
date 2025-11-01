@@ -24,7 +24,14 @@ class SettingsManager:
             'sidebar_width': 260,
             'footer_height': 160,
             'ollama_base_url': 'http://localhost:11434',
-            'ollama_cloud_base_url': 'https://ollama.com'
+            'ollama_cloud_base_url': 'https://ollama.com',
+            # Timeout settings (in seconds)
+            'api_timeout': 60,  # Default timeout for API providers (OpenAI, Groq, Together, AI71)
+            'ollama_cloud_timeout': 300,  # Timeout for Ollama Cloud streaming requests
+            'ollama_cloud_timeout_non_streaming': 60,  # Timeout for Ollama Cloud non-streaming requests
+            'ollama_timeout': 10,  # Timeout for local Ollama requests
+            'retry_timeout': 30.0,  # Timeout for retry decorator
+            'retry_max_attempts': 3  # Maximum retry attempts
         }
         
         # Load settings

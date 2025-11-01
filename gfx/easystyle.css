@@ -371,7 +371,7 @@ body .theme-selector {
 /* ========== PAGE CONTENT ========== */
 .page-content {
     padding-top: 0; /* No extra space above chat area */
-    padding-right: 2rem;
+    padding-right: 0; /* Remove right padding to fill to edge */
     padding-bottom: 0; /* No bottom padding */
     /* No padding-left here; we anchor with left boundary below */
     box-sizing: border-box;
@@ -385,12 +385,19 @@ body .theme-selector {
     flex-direction: column;
     overflow: hidden; /* Parent doesn't scroll, child does */
     min-height: 0; /* Important for flexbox children */
+    width: auto; /* Auto width based on left/right anchors */
 }
 
 /* When sidebar is collapsed, expand content fully and clear footer offset */
 body.sidebar-collapsed .page-content {
     left: 0 !important;
 }
+
+/* Settings page - no footer, so extend to bottom */
+.settings-page-content {
+    bottom: 0 !important; /* Extend to bottom since there's no footer */
+}
+
 body.sidebar-collapsed .terminal-footer {
     padding-left: 1rem !important; /* Small left padding when collapsed */
 }
@@ -426,7 +433,7 @@ body.sidebar-collapsed .q-drawer-container {
     display: flex;
     flex-direction: column;
     gap: 0.5rem; /* Tighter spacing between messages */
-    padding: 0.5rem 1rem 0.5rem 1rem; /* Small top/bottom + side padding inside scroll area */
+    padding: 0.5rem 0 0.5rem 1rem; /* Minimal padding - left only, no right padding */
     overflow-y: auto !important; /* Force scrolling to work */
     overflow-x: hidden;
     flex: 1 1 0; /* Take all available space */
@@ -434,6 +441,8 @@ body.sidebar-collapsed .q-drawer-container {
     max-height: 100%; /* Don't exceed parent */
     margin-top: 0; /* Remove any top margin */
     margin-bottom: 0;
+    margin-right: 0; /* No right margin */
+    width: 100%; /* Ensure full width */
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     scroll-behavior: smooth; /* Smooth autoscroll to latest output */
 }
@@ -441,6 +450,52 @@ body.sidebar-collapsed .q-drawer-container {
 /* Remove framework container padding that can add top/bottom gaps */
 .q-page-container { padding-top: 0 !important; padding-bottom: 0 !important; }
 .q-page { padding: 0 !important; }
+
+/* Message Block Format (name, separator, timestamp, content) */
+.message-block {
+    padding: 1rem 0;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    max-width: 100%; /* Ensure full width */
+    box-sizing: border-box; /* Include padding in width calculation */
+}
+
+.message-block * {
+    max-width: 100%; /* Ensure child elements don't exceed container */
+    box-sizing: border-box;
+}
+
+.message-block .text-lg {
+    margin-bottom: 0.5rem;
+    color: var(--accent-blue);
+}
+
+body.body--dark .message-block .text-lg {
+    color: var(--accent-blue);
+}
+
+.message-block .text-xs {
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+}
+
+.message-block .mt-2 {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* Ensure markdown content uses full width */
+.message-block .q-markdown,
+.message-block markdown,
+.message-block .markdown {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
 
 /* Chat Messages */
 .chat-message {
@@ -886,6 +941,9 @@ body .q-menu-item:hover {
 .markdown-content {
     font-family: 'JetBrains Mono', monospace;
     line-height: 1.8;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
 }
 
 .markdown-content code {
