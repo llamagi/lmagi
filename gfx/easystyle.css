@@ -146,6 +146,54 @@ body.body--dark .input:focus {
 body.body--dark .footer {
     background-color: rgba(255, 255, 255, 0.06);
 }
+/* Hacker page layout */
+.page-content {
+    padding: 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: calc(100vh - 200px);
+}
+.terminal-footer {
+    border-top: 1px solid rgba(99, 102, 241, 0.3);
+    backdrop-filter: blur(6px);
+}
+.terminal-prefix {
+    font-family: 'Courier New', Courier, monospace;
+    color: #22c55e;
+    font-weight: 700;
+}
+.prompt-input {
+    width: 100%;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    color: #e5e7eb;
+    background: rgba(17, 24, 39, 0.85);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 8px;
+    padding: 10px 12px;
+    outline: none;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.prompt-input:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
+}
+body.body--dark .prompt-input {
+    background: rgba(6, 10, 20, 0.95);
+}
+.send-btn {
+    color: #93c5fd;
+    border: 1px solid rgba(147, 197, 253, 0.3);
+}
+.send-btn:hover {
+    color: #bfdbfe;
+    border-color: rgba(147, 197, 253, 0.5);
+}
 
 # control style for interaction tabs of chat, logs, apik from .classes('tabs-style')
 

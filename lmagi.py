@@ -55,9 +55,8 @@ async def toggle_autonomous_reasoning(value):
 
 @ui.page('/')
 def main():
-    global executor, message_container, log, keys_container, log_buttons, text, selected_api
+    global executor, message_container, log, keys_container, text, selected_api
     executor = concurrent.futures.ThreadPoolExecutor()  # initialize thread pool executor to manage and execute multiple tasks concurrently
-    log_buttons = []  # List to store log button references
     selected_api = None  # Variable to store selected API
 
     async def send() -> None:
@@ -95,10 +94,7 @@ def main():
         await ui.run_javascript(
             f'localStorage.setItem("theme", "{"dark" if dark_mode.value else "light"}")'
         )
-        # update log button styles based on dark mode
-        for button in log_buttons:
-            button.classes(remove='light-log-buttons' if dark_mode.value else 'dark-log-buttons')
-            button.classes(add='dark-log-buttons' if dark_mode.value else 'light-log-buttons')
+        # nothing else needed; CSS responds to body--dark
 
     async def init_theme_from_storage():
         stored = await ui.run_javascript('localStorage.getItem("theme")')
@@ -137,62 +133,19 @@ def main():
                             ui.label(service.capitalize()).classes('font-bold')
                     create_model_menu(service)
 
-    # define log files and their paths
-    log_files = {
-        "Premises Log": "./memory/logs/premises.json",
-        "Not Premise Log": "./memory/logs/notpremise.json",
-        "Truth Tables Log": "./memory/truth/logs.txt",
-        "Thoughts Log": "./memory/logs/thoughts.json",
-        "Conclusions Log": "./memory/logs/conclusions.txt",
-        "Decisions Log": "./memory/logs/truth.json"
-    }
+    # (tabs removed; logs moved to /logs, API keys moved to /settings)
 
-    # function to view log files
-    def view_log(file_path):
-        log_content = openmind.read_log_file(file_path)  # Read log file content
-        log_container.clear()  # Clear the existing log content
-        with log_container:
-            ui.markdown(log_content).classes('w-full')  # Display log content
+    # Chat display area
+    with ui.column().classes('page-content'):
+        message_container = ui.column().classes('chat-container')
+        openmind.message_container = message_container
 
-    # create tabs menu for chat, logs, and API keys
-    with ui.tabs().classes('w-full') as tabs:
-        chat_tab = ui.tab('chat', label='💬 Chat', icon='chat').classes('tab-style')
-        logs_tab = ui.tab('logs', label='📊 Logs', icon='description').classes('tab-style')
-        api_tab = ui.tab('api', label='🔑 API Keys', icon='vpn_key').classes('tab-style')
-
-    # create tab panels for the tabs
-    with ui.tab_panels(tabs, value=chat_tab).props('style="background-color: rgba(255, 255, 255, 0.5);"').classes('response-style'):
-        message_container = ui.tab_panel(chat_tab).props('style="background-color: rgba(255, 255, 255, 0.5);"').classes('items-stretch response-container')
-        openmind.message_container = message_container  # Pass the container to OpenMind
-
-        # create logs tab panel
-        with ui.tab_panel(logs_tab):
-            log = ui.log().classes('w-full h-full')
-            log_container = ui.column().classes('w-full')
-            openmind.log = log  # Pass the log to OpenMind
-
-            log_buttons_container = ui.column().classes('w-full')
-            with log_buttons_container:
-                for log_name, log_path in log_files.items():
-                    button = ui.button(log_name, on_click=lambda path=log_path: view_log(path)).classes('log-buttons light-log-buttons' if dark_mode.value else 'dark-log-buttons')
-                    log_buttons.append(button)  # append button to log_buttons list
-
-        # create API keys tab panel
-        with ui.tab_panel(api_tab):
-            ui.label('Manage API Keys').classes('text-lg font-bold')
-            with ui.row().classes('items-center'):
-                openmind.service_input = ui.input('("together", "openai", "groq")').classes('flex-1 input')
-                openmind.key_input = ui.input('API Key').classes('flex-1 input')
-            with ui.dropdown_button('Actions', auto_close=True):
-                ui.menu_item('Add API Key', on_click=openmind.add_api_key).classes('api-action')
-                ui.menu_item('List API Keys', on_click=openmind.list_api_keys).classes('api-action')
-            keys_container = ui.column().classes('w-full')
-            openmind.keys_container = keys_container  # pass the container to OpenMind
-
-    # footer as input field and with external markdown link
-    with ui.footer().classes('footer'), ui.column().classes('footer'):
-        with ui.row().classes('w-full no-wrap items-center'):
-            text = ui.input(placeholder='Enter text here').classes('input').on('keydown.enter', send)  # input field with enter key event
+    # Terminal-style prompt footer
+    with ui.footer().classes('footer terminal-footer'):
+        with ui.row().classes('w-full items-center gap-2'):
+            ui.label('>').classes('terminal-prefix')
+            text = ui.textarea(placeholder='Type your prompt, press Enter to send...').props('rows=1 autogrow').classes('prompt-input')
+            ui.button(icon='send', on_click=send).classes('send-btn').props('flat round')
         ui.markdown('[easyAGI](https://rage.pythai.net)').classes('footer-link')
 
     # Start main loop to process user input (reasoning loop started separately if autonomous mode enabled)
@@ -432,6 +385,50 @@ def settings_page():
                 ui.button('List API Keys', on_click=openmind.list_api_keys, icon='list').classes('api-action')
             keys_container = ui.column().classes('w-full')
             openmind.keys_container = keys_container
+
+@ui.page('/logs')
+def logs_page():
+    add_head_html(ui)
+    dark_mode = ui.dark_mode()
+    drawer = SideNav(current_page='logs').create_drawer()
+
+    async def init_theme_from_storage():
+        stored = await ui.run_javascript('localStorage.getItem("theme")')
+        if stored == 'dark':
+            dark_mode.value = True
+        elif stored == 'light':
+            dark_mode.value = False
+
+    # simple header
+    nav = Navigation(current_page='logs', dark_mode=dark_mode, drawer=drawer)
+    nav.create_header()
+
+    ui.timer(0.1, init_theme_from_storage, once=True)
+
+    log_files = {
+        "Premises Log": "./memory/logs/premises.json",
+        "Not Premise Log": "./memory/logs/notpremise.json",
+        "Truth Tables Log": "./memory/truth/logs.txt",
+        "Thoughts Log": "./memory/logs/thoughts.json",
+        "Conclusions Log": "./memory/logs/conclusions.txt",
+        "Decisions Log": "./memory/logs/truth.json",
+    }
+
+    def view_log(file_path):
+        log_content = openmind.read_log_file(file_path)
+        log_container.clear()
+        with log_container:
+            ui.markdown(log_content).classes('w-full')
+
+    with ui.row().classes('w-full gap-2 q-pa-md'):
+        with ui.column().classes('w-1/4'):
+            ui.label('Logs').classes('text-lg font-bold')
+            for log_name, log_path in log_files.items():
+                ui.button(log_name, on_click=lambda p=log_path: view_log(p)).classes('logbuttons')
+
+        with ui.column().classes('w-3/4'):
+            ui.label('Log Viewer').classes('text-lg font-bold')
+            log_container = ui.column().classes('w-full')
 
 def signal_handler(sig, frame):
     """Handle graceful shutdown on SIGINT and SIGTERM"""

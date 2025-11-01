@@ -44,7 +44,7 @@ class Navigation:
                 with ui.row().classes('gap-2'):
                     self._create_nav_button('Chat', '/', 'chat', 'chat')
                     self._create_nav_button('Ollama', '/ollama', 'ollama', 'psychology')
-                    self._create_nav_button('Logs', '/#logs', 'logs', 'description')
+                    self._create_nav_button('Logs', '/logs', 'logs', 'description')
                     # Settings page (includes API Keys)
                     self._create_nav_button('Settings', '/settings', 'settings', 'settings')
 
