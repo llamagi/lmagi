@@ -219,36 +219,46 @@ class SideNav:
         """Create enhanced side navigation drawer with hacker aesthetic"""
         with ui.left_drawer(fixed=True, bordered=False).props('width=260').classes('left-drawer') as drawer:
             with ui.column().classes('drawer-content'):
-                # Sidebar Header - Compact
+                # Sidebar Header - Enhanced with better styling
                 with ui.row().classes('items-center q-px-md q-pt-md q-pb-sm'):
-                    ui.icon('terminal').classes('text-lg')
+                    ui.icon('terminal').classes('text-lg').style('color: var(--accent-blue); filter: drop-shadow(0 0 6px rgba(69, 133, 136, 0.6));')
                     ui.label('NAV').classes('text-xl font-bold q-ml-2')
                 
                 ui.separator()
 
-                # Main Navigation Items - Compact layout
-                with ui.column().classes('q-px-md'):
-                    self._create_drawer_item('💬 Chat', '/', 'chat', 'chat')
-                    self._create_drawer_item('🤖 Ollama', '/ollama', 'ollama', 'psychology')
-                    self._create_drawer_item('📊 Logs', '/logs', 'logs', 'description')
-                    self._create_drawer_item('⚙️ Settings', '/settings', 'settings', 'settings')
+                # Main Navigation Items - Enhanced spacing and grouping
+                with ui.column().classes('q-px-none'):
+                    # Navigation group with consistent spacing
+                    nav_items = [
+                        ('💬 Chat', '/', 'chat', 'chat'),
+                        ('🤖 Ollama', '/ollama', 'ollama', 'psychology'),
+                        ('📊 Logs', '/logs', 'logs', 'description'),
+                        ('⚙️ Settings', '/settings', 'settings', 'settings')
+                    ]
+                    
+                    for label, target, page_id, icon in nav_items:
+                        self._create_drawer_item(label, target, page_id, icon)
 
+                # Footer separator - positioned at bottom
                 ui.separator().classes('q-mt-auto')
 
-                # Compact Footer Section
-                with ui.column().classes('q-px-md q-pb-md'):
-                    ui.markdown('[easyAGI](https://rage.pythai.net)').classes('text-xs opacity-60')
+                # Compact Footer Section - Enhanced styling
+                with ui.column().classes('q-px-md q-pb-md q-pt-sm'):
+                    footer_link = ui.markdown('[easyAGI](https://rage.pythai.net)').classes('text-xs opacity-60')
+                    footer_link.style('transition: opacity 0.2s ease;')
+                    footer_link.on('mouseenter', lambda: footer_link.style('opacity: 0.9;'))
+                    footer_link.on('mouseleave', lambda: footer_link.style('opacity: 0.6;'))
 
         return drawer
 
     def _create_drawer_item(self, label, target, page_id, icon):
-        """Create enhanced drawer navigation item with active state - compact version"""
+        """Create enhanced drawer navigation item with active state - enhanced version"""
         is_active = self.current_page == page_id
 
         with ui.item(on_click=lambda t=target: ui.navigate.to(t)).props('clickable').classes(
             'cursor-pointer drawer-nav-item' + (' active' if is_active else '')
         ):
-            with ui.item_section():
+            with ui.item_section().props('avatar'):
                 ui.icon(icon).classes('text-md')
             with ui.item_section():
                 ui.label(label).classes('font-mono text-sm')
