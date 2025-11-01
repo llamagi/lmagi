@@ -14,10 +14,16 @@ import subprocess
 import threading
 import time
 import tempfile
-from PyQt6.QtCore import QUrl, Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, QEvent
+from PyQt6.QtCore import QUrl, Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, QEvent, QObject, pyqtSlot
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QWidget, QLabel, QSizePolicy, QGraphicsDropShadowEffect
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
+try:
+    from PyQt6.QtWebChannel import QWebChannel
+    WEBCHANNEL_AVAILABLE = True
+except ImportError:
+    WEBCHANNEL_AVAILABLE = False
+    logger.warning("QWebChannel not available - fullscreen button will control browser view only")
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtGui import QMovie, QFont
@@ -28,6 +34,34 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+class WindowBridge(QObject):
+    """Bridge object to expose window methods to JavaScript via QWebChannel"""
+    
+    def __init__(self, window):
+        super().__init__()
+        self.window = window
+    
+    @pyqtSlot(result=bool)
+    def isFullScreen(self):
+        """Check if window is in fullscreen mode"""
+        return self.window.isFullScreen()
+    
+    @pyqtSlot()
+    def toggleFullScreen(self):
+        """Toggle window fullscreen mode"""
+        if self.window.isFullScreen():
+            self.window.showNormal()
+            logger.info("Exiting fullscreen mode")
+        else:
+            self.window.showFullScreen()
+            logger.info("Entering fullscreen mode")
+    
+    @pyqtSlot(result=bool)
+    def isMaximized(self):
+        """Check if window is maximized"""
+        return self.window.isMaximized()
 
 
 class LmagiGUI(QMainWindow):
@@ -65,6 +99,17 @@ class LmagiGUI(QMainWindow):
         self.browser = QWebEngineView()
         self.browser.setUrl(QUrl("about:blank"))
         self.browser.hide()  # Hide until backend is ready
+        
+        # Set up WebChannel for JavaScript-Python communication
+        if WEBCHANNEL_AVAILABLE:
+            self.window_bridge = WindowBridge(self)
+            self.web_channel = QWebChannel()
+            self.web_channel.registerObject("windowBridge", self.window_bridge)
+            self.browser.page().setWebChannel(self.web_channel)
+            logger.info("WebChannel bridge set up for window control")
+        else:
+            logger.warning("QWebChannel not available - window control features disabled")
+        
         layout.addWidget(self.browser)
 
     def create_splash_screen(self, parent_layout, video_path):
@@ -583,6 +628,11 @@ class LmagiGUI(QMainWindow):
         self.browser.setUrl(QUrl("http://localhost:8080"))
         # Don't show browser yet - wait for splash to finish
         self.browser.hide()
+        
+        # Set up WebChannel again after URL is set (in case page reloads)
+        if WEBCHANNEL_AVAILABLE and hasattr(self, 'web_channel'):
+            self.browser.page().setWebChannel(self.web_channel)
+            logger.info("WebChannel bridge re-established after URL load")
         
         # Store that backend is ready
         self._backend_ready = True

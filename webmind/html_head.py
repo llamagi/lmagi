@@ -5,6 +5,68 @@ def add_head_html(ui, server_settings=None):
     ui.add_head_html('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
     ui.add_head_html('<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">')
     
+    # Add WebChannel script for PyQt6 window control (when running in desktop app)
+    ui.add_head_html('''
+    <script>
+        // Initialize WebChannel bridge for PyQt6 window control
+        (function() {
+            // Wait for WebChannel to be available (PyQt6 provides this)
+            function initWebChannel() {
+                if (typeof qt !== 'undefined' && qt.webChannelTransport) {
+                    if (typeof QWebChannel !== 'undefined') {
+                        new QWebChannel(qt.webChannelTransport, function(channel) {
+                            window.qtWindowBridge = channel.objects.windowBridge;
+                            console.log('WebChannel bridge initialized - window control available');
+                            // Trigger a custom event so other scripts know the bridge is ready
+                            window.dispatchEvent(new CustomEvent('qtWindowBridgeReady'));
+                        });
+                    } else {
+                        // Load QWebChannel script if not already loaded
+                        if (!document.querySelector('script[src*="qwebchannel"]')) {
+                            const script = document.createElement('script');
+                            script.src = 'qrc:///qtwebchannel/qwebchannel.js';
+                            script.onload = function() {
+                                if (typeof QWebChannel !== 'undefined' && qt.webChannelTransport) {
+                                    new QWebChannel(qt.webChannelTransport, function(channel) {
+                                        window.qtWindowBridge = channel.objects.windowBridge;
+                                        console.log('WebChannel bridge initialized - window control available');
+                                        window.dispatchEvent(new CustomEvent('qtWindowBridgeReady'));
+                                    });
+                                }
+                            };
+                            document.head.appendChild(script);
+                        }
+                    }
+                } else {
+                    // Running in browser (not PyQt6) - fallback to browser fullscreen API
+                    console.log('WebChannel not available - using browser fullscreen API');
+                }
+            }
+            
+            // Try to initialize immediately
+            initWebChannel();
+            
+            // Also try after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initWebChannel);
+            }
+            
+            // Poll for qt object if it's not ready yet (for slow-loading PyQt6 environments)
+            let pollCount = 0;
+            const pollInterval = setInterval(function() {
+                pollCount++;
+                if (typeof qt !== 'undefined' && qt.webChannelTransport) {
+                    clearInterval(pollInterval);
+                    initWebChannel();
+                } else if (pollCount > 20) {
+                    // Stop polling after 10 seconds
+                    clearInterval(pollInterval);
+                }
+            }, 500);
+        })();
+    </script>
+    ''')
+    
     # CRITICAL FIX #1: Inline critical CSS to prevent flash - load full CSS after
     # This ensures theme colors are available immediately, preventing white flash
     ui.add_head_html('<link rel="stylesheet" href="/gfx/easystyle.css">')

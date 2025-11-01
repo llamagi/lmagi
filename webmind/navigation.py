@@ -49,7 +49,6 @@ class Navigation:
                 if autonomous_callback:
                     initial_state = bool(autonomous_state) if autonomous_state is not None else False
                     with ui.row().classes('items-center gap-2'):
-                        ui.icon('settings').classes('text-sm')
                         ui.switch('Autonomous', value=initial_state, on_change=autonomous_callback).props(
                             'color=white'
                         ).classes('text-sm font-mono')
@@ -66,6 +65,60 @@ class Navigation:
                     on_click=self._toggle_fullscreen,
                     icon='fullscreen'
                 ).props('flat round color=white').classes('nav-control-btn fullscreen-btn')
+                
+                # Initialize fullscreen event listeners once
+                ui.run_javascript('''
+                    (function() {
+                        // Only set up listeners if not already set up
+                        if (window.__fullscreenListenersSetup) return;
+                        window.__fullscreenListenersSetup = true;
+                        
+                        const updateFullscreenIcon = () => {
+                            let isFs = false;
+                            
+                            // Check PyQt6 window state first (when available)
+                            if (window.qtWindowBridge && typeof window.qtWindowBridge.isFullScreen === 'function') {
+                                try {
+                                    isFs = window.qtWindowBridge.isFullScreen();
+                                } catch (e) {
+                                    // Fall back to browser fullscreen check
+                                    isFs = !!(document.fullscreenElement || 
+                                             document.webkitFullscreenElement || 
+                                             document.mozFullScreenElement || 
+                                             document.msFullscreenElement);
+                                }
+                            } else {
+                                // Browser fullscreen check
+                                isFs = !!(document.fullscreenElement || 
+                                       document.webkitFullscreenElement || 
+                                       document.mozFullScreenElement || 
+                                       document.msFullscreenElement);
+                            }
+                            
+                            const btn = document.querySelector('.fullscreen-btn');
+                            if (btn) {
+                                const icon = btn.querySelector('i');
+                                if (icon) {
+                                    icon.textContent = isFs ? 'fullscreen_exit' : 'fullscreen';
+                                }
+                            }
+                        };
+                        
+                        // Listen to fullscreen change events (with vendor prefixes) for browser fallback
+                        document.addEventListener('fullscreenchange', updateFullscreenIcon);
+                        document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+                        document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
+                        document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
+                        
+                        // Also poll window state when using PyQt6 bridge (check every 500ms)
+                        if (window.qtWindowBridge) {
+                            setInterval(updateFullscreenIcon, 500);
+                        }
+                        
+                        // Initial icon update
+                        updateFullscreenIcon();
+                    })();
+                ''')
 
     async def _toggle_dark_mode(self, button, callback):
         """Toggle dark mode and update button"""
@@ -74,27 +127,82 @@ class Navigation:
         button.props(f'icon={"light_mode" if self.dark_mode.value else "dark_mode"}')
 
     def _toggle_fullscreen(self):
-        """Toggle fullscreen mode"""
+        """Toggle fullscreen mode - uses PyQt6 window when available, falls back to browser fullscreen"""
         ui.run_javascript('''
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log('Error attempting to enable fullscreen:', err);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-            
-            // Update icon based on fullscreen state
-            setTimeout(() => {
-                const isFullscreen = !!document.fullscreenElement;
-                const btn = document.querySelector('.fullscreen-btn');
-                if (btn) {
-                    const icon = btn.querySelector('i');
-                    if (icon) {
-                        icon.textContent = isFullscreen ? 'fullscreen_exit' : 'fullscreen';
+            (function() {
+                // Try to use PyQt6 window bridge first (when running in desktop app)
+                if (window.qtWindowBridge && typeof window.qtWindowBridge.toggleFullScreen === 'function') {
+                    try {
+                        window.qtWindowBridge.toggleFullScreen();
+                        // Update icon based on window state
+                        setTimeout(() => {
+                            const isFs = window.qtWindowBridge.isFullScreen();
+                            const btn = document.querySelector('.fullscreen-btn');
+                            if (btn) {
+                                const icon = btn.querySelector('i');
+                                if (icon) {
+                                    icon.textContent = isFs ? 'fullscreen_exit' : 'fullscreen';
+                                }
+                            }
+                        }, 100);
+                        return;
+                    } catch (e) {
+                        console.log('Error using window bridge:', e);
+                        // Fall through to browser fullscreen API
                     }
                 }
-            }, 100);
+                
+                // Fallback to browser fullscreen API (for web browser usage)
+                const doc = document.documentElement;
+                const isFullscreen = !!(document.fullscreenElement || 
+                                       document.webkitFullscreenElement || 
+                                       document.mozFullScreenElement || 
+                                       document.msFullscreenElement);
+                
+                if (!isFullscreen) {
+                    // Request fullscreen with vendor prefixes for cross-browser support
+                    if (doc.requestFullscreen) {
+                        doc.requestFullscreen().catch(err => {
+                            console.log('Error attempting to enable fullscreen:', err);
+                        });
+                    } else if (doc.webkitRequestFullscreen) {
+                        // Safari/Chrome (older versions)
+                        doc.webkitRequestFullscreen();
+                    } else if (doc.mozRequestFullScreen) {
+                        // Firefox
+                        doc.mozRequestFullScreen();
+                    } else if (doc.msRequestFullscreen) {
+                        // IE/Edge (older versions)
+                        doc.msRequestFullscreen();
+                    }
+                } else {
+                    // Exit fullscreen with vendor prefixes
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                }
+                
+                // Update icon after a short delay to ensure state is updated
+                setTimeout(() => {
+                    const isFs = !!(document.fullscreenElement || 
+                                   document.webkitFullscreenElement || 
+                                   document.mozFullScreenElement || 
+                                   document.msFullscreenElement);
+                    const btn = document.querySelector('.fullscreen-btn');
+                    if (btn) {
+                        const icon = btn.querySelector('i');
+                        if (icon) {
+                            icon.textContent = isFs ? 'fullscreen_exit' : 'fullscreen';
+                        }
+                    }
+                }, 100);
+            })();
         ''')
 
 
