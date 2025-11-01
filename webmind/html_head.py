@@ -1,6 +1,6 @@
 # html_head.py
 
-def add_head_html(ui):
+def add_head_html(ui, server_settings=None):
     ui.add_head_html('<link rel="preconnect" href="https://fonts.googleapis.com">')
     ui.add_head_html('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
     ui.add_head_html('<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">')
@@ -8,6 +8,69 @@ def add_head_html(ui):
     # CRITICAL FIX #1: Inline critical CSS to prevent flash - load full CSS after
     # This ensures theme colors are available immediately, preventing white flash
     ui.add_head_html('<link rel="stylesheet" href="/gfx/easystyle.css">')
+    
+    # NEW: Seed localStorage from server settings BEFORE blocking theme init
+    if server_settings:
+        try:
+            # Build script that writes server settings into localStorage synchronously
+            seed_js = (
+                "<script>(function(){try{"
+                f"localStorage.setItem('ui-theme','{server_settings.get('ui-theme','everforest')}');"
+                f"localStorage.setItem('theme','{server_settings.get('theme','dark')}');"
+                f"localStorage.setItem('autonomous-reasoning','{server_settings.get('autonomous-reasoning','false')}');"
+                f"localStorage.setItem('sidebar-width','{server_settings.get('sidebar-width','260')}');"
+                f"localStorage.setItem('footer-height','{server_settings.get('footer-height','160')}');"
+                "}catch(e){}})();</script>"
+            )
+            ui.add_head_html(seed_js)
+        except Exception:
+            # Fail silently; blocking script below still applies defaults
+            pass
+        
+        # EXTRA: Inject minimal server-rendered critical CSS using persisted theme
+        try:
+            theme_name = server_settings.get('ui-theme', 'everforest')
+            dark_mode = (server_settings.get('theme', 'dark') == 'dark')
+            theme_colors = {
+                'everforest': {
+                    'bg0': '#2d353b', 'bg1': '#343f44', 'bg2': '#3d484d',
+                    'bgl0': '#fdf6e3', 'bgl1': '#efead4', 'bgl2': '#dfd9c2',
+                    'fgd': '#d3c6aa', 'fgl': '#5c6a72', 'blue': '#7fbbb3', 'green': '#a7c080'
+                },
+                'gruvbox': {
+                    'bg0': '#282828', 'bg1': '#3c3836', 'bg2': '#504945',
+                    'bgl0': '#fbf1c7', 'bgl1': '#ebdbb2', 'bgl2': '#d5c4a1',
+                    'fgd': '#ebdbb2', 'fgl': '#3c3836', 'blue': '#458588', 'green': '#689d6a'
+                },
+                'nord': {
+                    'bg0': '#2e3440', 'bg1': '#3b4252', 'bg2': '#434c5e',
+                    'bgl0': '#eceff4', 'bgl1': '#e5e9f0', 'bgl2': '#d8dee9',
+                    'fgd': '#eceff4', 'fgl': '#3b4252', 'blue': '#5e81ac', 'green': '#a3be8c'
+                },
+                'catppuccin': {
+                    'bg0': '#1e1e2e', 'bg1': '#181825', 'bg2': '#313244',
+                    'bgl0': '#eff1f5', 'bgl1': '#e6e9ef', 'bgl2': '#dce0e8',
+                    'fgd': '#cdd6f4', 'fgl': '#4c4f69', 'blue': '#89b4fa', 'green': '#a6e3a1'
+                },
+            }
+            c = theme_colors.get(theme_name, theme_colors['everforest'])
+            bg0 = c['bg0'] if dark_mode else c['bgl0']
+            bg1 = c['bg1'] if dark_mode else c['bgl1']
+            fg = c['fgd'] if dark_mode else c['fgl']
+            blue = c['blue']
+            critical_css = (
+                '<style id="server-theme-critical">'
+                f'html,body{{background-color:{bg0} !important;color:{fg} !important;}}'
+                f'.left-drawer{{background-color:{bg1} !important;border-right:1px solid {blue} !important;}}'
+                f'.app-header{{background-color:{bg1} !important;border-bottom:1px solid {blue} !important;}}'
+                f'.terminal-footer{{background-color:{bg1} !important;border-top:1px solid {blue} !important;}}'
+                f'.q-card{{background-color:{bg1} !important;color:{fg} !important;}}'
+                f'.q-btn:not(.q-fab){{background-color:{bg1} !important;color:{fg} !important;}}'
+                '</style>'
+            )
+            ui.add_head_html(critical_css)
+        except Exception:
+            pass
     
     # CRITICAL: Block rendering until theme is applied - prevents flash
     ui.add_head_html('''
@@ -58,12 +121,12 @@ def add_head_html(ui):
             function applyThemeImmediately() {
                 try {
                     // Read from localStorage with fallback to defaults
-                    const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+                    const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
                     const savedThemeMode = localStorage.getItem('theme');
                     // Default to dark mode if not set (matches SettingsManager default)
                     const savedDarkMode = savedThemeMode === null ? true : savedThemeMode === 'dark';
                     
-                    const colors = window.themeColors[savedTheme] || window.themeColors['gruvbox'];
+                    const colors = window.themeColors[savedTheme] || window.themeColors['everforest'];
                     const bgColor = savedDarkMode ? colors['--bg-0'] : colors['--bg-light-0'];
                     const bg1Color = savedDarkMode ? colors['--bg-1'] : colors['--bg-light-1'];
                     const fgColor = savedDarkMode ? colors['--fg-0'] : colors['--fg-light-0'];
@@ -228,7 +291,7 @@ def add_head_html(ui):
                 } catch(e) {
                     console.error('Theme init error:', e);
                     document.documentElement.style.display = '';
-                    return 'gruvbox';
+                    return 'everforest';
                 }
             }
             
@@ -248,7 +311,7 @@ def add_head_html(ui):
                 const existingStyle = document.getElementById('theme-inline');
                 if (window.themeColors) {
                     const savedDarkMode = localStorage.getItem('theme') === 'dark';
-                    const colors = window.themeColors[theme] || window.themeColors['gruvbox'];
+                    const colors = window.themeColors[theme] || window.themeColors['everforest'];
                     let cssVars = ':root, html[data-theme="' + theme + '"], body[data-theme="' + theme + '"], html[data-theme="' + theme + '"] body, body[data-theme="' + theme + '"] * {';
                     for (const [key, value] of Object.entries(colors)) {
                         cssVars += key + ':' + value + ' !important;';
@@ -456,7 +519,7 @@ def add_head_html(ui):
     <script>
             // CRITICAL FIX #3: Single consolidated theme initialization function
         function initializeTheme() {
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             // CRITICAL: Read dark mode from localStorage - default to dark if not set
             const savedThemeMode = localStorage.getItem('theme');
             const savedDarkMode = savedThemeMode === null ? true : savedThemeMode === 'dark';
@@ -806,11 +869,11 @@ def add_head_html(ui):
             // CRITICAL FIX #7: Watch for #q-app changes (NiceGUI's root element) with debouncing
             // Only apply theme if it actually changed to avoid redundant calls
             let qAppThemeTimeout;
-            let lastAppliedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            let lastAppliedTheme = localStorage.getItem('ui-theme') || 'everforest';
             let lastAppliedDarkMode = localStorage.getItem('theme') === 'dark';
             
             const qAppObserver = new MutationObserver(function() {
-                const currentTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+                const currentTheme = localStorage.getItem('ui-theme') || 'everforest';
                 const currentDarkMode = localStorage.getItem('theme') === 'dark';
                 // Only apply if theme actually changed
                 if (currentTheme !== lastAppliedTheme || currentDarkMode !== lastAppliedDarkMode) {

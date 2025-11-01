@@ -85,9 +85,14 @@ def main():
         ui.notify(f'Selected API: {service}', type='info')
         logging.info(f'Selected API: {service}')
 
-    # configure HTML head content from html_head.py external module in the webmind folder
-    add_head_html(ui)
+    # configure HTML head content from html_head.py; seed localStorage from server settings to avoid flash
+    add_head_html(ui, settings_manager.sync_to_localStorage())
     dark_mode = ui.dark_mode()
+    # Ensure dark mode reflects persisted settings before building header/UI
+    try:
+        dark_mode.value = settings_manager.get('dark_mode', True)
+    except Exception:
+        dark_mode.value = True
     
     # CRITICAL FIX #5: Restore autonomous state BEFORE creating header
     # Use SettingsManager to restore state synchronously
@@ -116,7 +121,7 @@ def main():
         # Persist to both localStorage and SettingsManager
         await ui.run_javascript(f'''
             localStorage.setItem('theme', '{'dark' if dark_mode.value else 'light'}');
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }} else {{
@@ -135,7 +140,7 @@ def main():
 
     async def init_theme_from_storage():
         # Load from SettingsManager first (server-side persistence)
-        theme_name = settings_manager.get('theme', 'gruvbox')
+        theme_name = settings_manager.get('theme', 'everforest')
         dark_mode_setting = settings_manager.get('dark_mode', True)
         
         # Sync to localStorage (browser persistence)
@@ -149,7 +154,7 @@ def main():
         
         # CRITICAL FIX #2: Sync with unified theme system after restoring
         await ui.run_javascript(f'''
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }}
@@ -327,9 +332,14 @@ def ollama_page():
             logging.error(f"Exception during model listing: {e}")
             ui.notify('Exception occurred while listing models.', type='negative')
 
-    # configure HTML head content from html_head.py external module in the webmind folder
-    add_head_html(ui)
+    # configure HTML head content; seed localStorage from server settings to avoid flash
+    add_head_html(ui, settings_manager.sync_to_localStorage())
     dark_mode = ui.dark_mode()
+    # Ensure dark mode reflects persisted settings before building header/UI
+    try:
+        dark_mode.value = settings_manager.get('dark_mode', True)
+    except Exception:
+        dark_mode.value = True
     
     # CRITICAL FIX #5: Restore autonomous state BEFORE creating header
     # Use SettingsManager to restore state synchronously
@@ -357,7 +367,7 @@ def ollama_page():
         # Persist to both localStorage and SettingsManager
         await ui.run_javascript(f'''
             localStorage.setItem('theme', '{'dark' if dark_mode.value else 'light'}');
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }}
@@ -367,7 +377,7 @@ def ollama_page():
 
     async def init_theme_from_storage():
         # Load from SettingsManager first (server-side persistence)
-        theme_name = settings_manager.get('theme', 'gruvbox')
+        theme_name = settings_manager.get('theme', 'everforest')
         dark_mode_setting = settings_manager.get('dark_mode', True)
         
         # Sync to localStorage (browser persistence)
@@ -381,7 +391,7 @@ def ollama_page():
         
         # CRITICAL FIX #2: Sync with unified theme system after restoring
         await ui.run_javascript(f'''
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }}
@@ -479,8 +489,13 @@ def ollama_page():
 @ui.page('/settings')
 def settings_page():
     """Application settings: appearance and API keys"""
-    add_head_html(ui)
+    add_head_html(ui, settings_manager.sync_to_localStorage())
     dark_mode = ui.dark_mode()
+    # Ensure dark mode reflects persisted settings before building header/UI
+    try:
+        dark_mode.value = settings_manager.get('dark_mode', True)
+    except Exception:
+        dark_mode.value = True
     
     # CRITICAL FIX #5: Restore autonomous state BEFORE creating header
     # Use SettingsManager to restore state synchronously
@@ -505,7 +520,7 @@ def settings_page():
 
     async def init_theme_from_storage():
         # Load from SettingsManager first (server-side persistence)
-        theme_name = settings_manager.get('theme', 'gruvbox')
+        theme_name = settings_manager.get('theme', 'everforest')
         dark_mode_setting = settings_manager.get('dark_mode', True)
         
         # Sync to localStorage (browser persistence)
@@ -519,7 +534,7 @@ def settings_page():
         
         # CRITICAL FIX #2: Sync with unified theme system after restoring
         await ui.run_javascript(f'''
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }}
@@ -531,7 +546,7 @@ def settings_page():
         # CRITICAL FIX #2: Sync dark mode with unified theme system
         await ui.run_javascript(f'''
             localStorage.setItem('theme', '{'dark' if dark_mode.value else 'light'}');
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }} else {{
@@ -628,7 +643,7 @@ def settings_page():
                     ui.notify(f'Theme changed to {theme_name}', type='positive')
                 
                 async def init_theme_selector():
-                    saved = await ui.run_javascript('localStorage.getItem("ui-theme") || "gruvbox"')
+                    saved = await ui.run_javascript('localStorage.getItem("ui-theme") || "everforest"')
                     theme_select.value = saved
                 
                 theme_select = ui.select(
@@ -638,7 +653,7 @@ def settings_page():
                         'nord': '❄️ Nord',
                         'catppuccin': '☕ Catppuccin Mocha'
                     },
-                    value='gruvbox',
+                    value='everforest',
                     on_change=lambda e: change_theme(e.value)
                 ).classes('theme-selector w-full').props('outlined')
                 
@@ -659,13 +674,18 @@ def settings_page():
 
 @ui.page('/logs')
 def logs_page():
-    add_head_html(ui)
+    add_head_html(ui, settings_manager.sync_to_localStorage())
     dark_mode = ui.dark_mode()
+    # Ensure dark mode reflects persisted settings before building header/UI
+    try:
+        dark_mode.value = settings_manager.get('dark_mode', True)
+    except Exception:
+        dark_mode.value = True
     drawer = SideNav(current_page='logs').create_drawer()
 
     async def init_theme_from_storage():
         # Load from SettingsManager first (server-side persistence)
-        theme_name = settings_manager.get('theme', 'gruvbox')
+        theme_name = settings_manager.get('theme', 'everforest')
         dark_mode_setting = settings_manager.get('dark_mode', True)
         
         # Sync to localStorage (browser persistence)
@@ -679,7 +699,7 @@ def logs_page():
         
         # CRITICAL FIX #2: Sync with unified theme system after restoring
         await ui.run_javascript(f'''
-            const savedTheme = localStorage.getItem('ui-theme') || 'gruvbox';
+            const savedTheme = localStorage.getItem('ui-theme') || 'everforest';
             if (window.applyTheme) {{
                 window.applyTheme(savedTheme, {str(dark_mode.value).lower()});
             }}
