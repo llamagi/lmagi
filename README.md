@@ -1,12 +1,16 @@
-# lmagi<br />
-# language model Augmented Generative Intelligence
-ollama integration NOT yet integrated with the reasoning components
+# <a href="https://rage.pythai.net/introducing-kuntai-deepdive/">lmagi</a> thinking machine<br />
+# local model Augmented Generative Intelligence
+# ollama models are recognized in the ollama tab
 
 ![lmAGI](./gfx/llamagi.jpg)
-
+<a href="https://github.com/easyAGI/fastAGI/blob/main/automind/display_helpers.py">display helpers</a><br /> 
 # lmAGI
 language model Augmented Generative Intelligence<br />
-This is the development version of easyAGI's lmagi UI/UX. It showcases multi-model reasoning with persistent memory and a modern web UI powered by NiceGUI. The preferred way to run is via the native desktop wrapper `lmagi_gui.py`, which launches the backend and embeds the web app.
+lmagi showcases multi-model reasoning with persistent memory and a modern web UI powered by NiceGUI. The preferred way to run is via the native desktop wrapper `lmagi_gui.py`, which launches the backend and embeds the web app.
+local model / language model Augmented Generative Intelligence<br />
+this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/">easyAGI</a> roadmap to display the reasoning capabilities as log files<br />
+integration with ollama point of departure can be found at <a href="https://github.com/llamagi/lmagi">lmagi</a><br />
+project development has migrated to the <a href="https://github.com/easyAGI/">easyAGI</a> roadmap<br />
 
 Project development aligns with the <a href="https://github.com/easyAGI/">easyAGI</a> roadmap.<br />
 Source code: <a href="https://github.com/llamagi/lmagi">lmagi</a>
