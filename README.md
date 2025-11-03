@@ -5,12 +5,17 @@
 ![lmAGI](./gfx/llamagi.jpg)
 <a href="https://github.com/easyAGI/fastAGI/blob/main/automind/display_helpers.py">display helpers</a><br /> 
 # lmAGI
+language model Augmented Generative Intelligence<br />
+lmagi showcases multi-model reasoning with persistent memory and a modern web UI powered by NiceGUI. The preferred way to run is via the native desktop wrapper `lmagi_gui.py`, which launches the backend and embeds the web app.
 local model / language model Augmented Generative Intelligence<br />
 this is the development version of ezAGI becoming lmagi on route to <a href="https://github.com/easyAGI/easyAGI/">easyAGI</a> roadmap to display the reasoning capabilities as log files<br />
 integration with ollama point of departure can be found at <a href="https://github.com/llamagi/lmagi">lmagi</a><br />
 project development has migrated to the <a href="https://github.com/easyAGI/">easyAGI</a> roadmap<br />
 
-an exercise in multi-model integration for LLM rational enhancement<br />
+Project development aligns with the <a href="https://github.com/easyAGI/">easyAGI</a> roadmap.<br />
+Source code: <a href="https://github.com/llamagi/lmagi">lmagi</a>
+
+An exercise in multi-model integration for LLM rational enhancement.<br />
 
 ```python
 aug·ment·ed
@@ -40,56 +45,66 @@ noun: intelligence
 ```
 
 lmAGI
-an expression of enhanced reasoning for LLM with ./memory/stm and advanced log files with responses to hightlight internal reasoning as working concept of machine reasoning
+An expression of enhanced reasoning for LLM with `./memory/stm` and advanced log files that highlight internal reasoning as a working concept of machine reasoning.
 
-# requirements
-python3 > 3.7<br />
+# Requirements
+Python ≥ 3.9<br />
 pip<br />
-# API handling for together groq and openai<br />
-<a href="https://console.groq.com/docs/quickstart">groq API key</a> or <br />
-<a href="https://openai.com/index/openai-api/">openai API key</a> or <br />
-<a href="https://api.together.xyz/signin?redirectUrl=/settings/api-keys">together.ai</a><br />
+
+API keys (one or more):<br />
+<a href="https://console.groq.com/docs/quickstart">Groq API key</a> • <a href="https://openai.com/index/openai-api/">OpenAI API key</a> • <a href="https://api.together.xyz/signin?redirectUrl=/settings/api-keys">Together.ai API key</a>
 
 
-# LINUX INSTALL
-
-sudo apt install git
+## Quick Start (macOS & Linux)
 
 ```bash
-git clone https://github.com/llamagi/lmagi/
+git clone https://github.com/llamagi/lmagi
 cd lmagi
-python3 -m venv agi
-source agi/bin/activate
-pip install -r requirements.txt
-# activate ezAGI.py with internal reasoning (EXPERIMENTAL)
-python3 ezAGI.py
+chmod +x setup.sh
+./setup.sh  # creates ./venv, installs deps, scaffolds .env
 ```
 
-# WINDOWS INSTALL
-
-open command prompt
+Run the GUI (recommended):
 ```bash
-Press Win + R, type cmd, press Enter
+source venv/bin/activate
+python lmagi_gui.py
 ```
+
+Run the backend directly (browser opens automatically):
 ```bash
-git clone https://github.com/llamagi/lmagi/
+source venv/bin/activate
+python lmagi.py  # serves at http://localhost:8080
+```
+
+## Quick Start (Windows)
+
+Open Command Prompt and run:
+```bash
+git clone https://github.com/llamagi/lmagi
 cd lmagi
-python3 -m venv agi
-agi\Scripts\activate
+python -m venv venv
+venv\Scripts\activate
 pip install -r requirements.txt
-# activate llama.py with internal reasoning (EXPERIMENTAL)
-python3 ezAGI.py
+python lmagi_gui.py
 ```
-is possible that windows requires<br />
-```python
-python3 -m pip install -r requirements.txt
-```
-to install the requirements
 
-suggested: add groq api key
-![lmAGI](./gfx/addAPIkeygroq.png)
-select groq api key after adding
-![lmAGI](./gfx/selectGROQafteraddingkey.png)
+If `pip` is not on PATH, you may need:
+```bash
+python -m pip install -r requirements.txt
+```
+
+## Usage
+
+- Open the app (GUI or `python lmagi.py` → `http://localhost:8080`).
+- Go to Settings → API Keys to add one or more provider keys.
+- Return to Chat and select the model/provider in the footer menu.
+- Start chatting; autonomous reasoning can be toggled from the header.
+
+Chat example:
+![Chat Screenshot](./gfx/chat-screenshot.png)
+
+Adding API keys:
+![API Keys Screenshot](./gfx/api-key-screenshot.png)
 
 
 

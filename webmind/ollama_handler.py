@@ -13,10 +13,34 @@ class OllamaHandler:
     """
     Class to interact with Llama3 model via the Ollama service.
     """
-    def __init__(self):
-        self.api_url = "http://localhost:11434/api"
+    def __init__(self, base_url=None):
+        if base_url is None:
+            # Try to load from settings if available
+            try:
+                from webmind.settings import SettingsManager
+                settings = SettingsManager()
+                base_url = settings.get('ollama_base_url', 'http://localhost:11434')
+            except:
+                base_url = 'http://localhost:11434'
+        
+        # Ensure base_url doesn't have trailing /api - we'll add it
+        base_url = base_url.rstrip('/')
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]
+        
+        self.base_url = base_url
+        self.api_url = f"{base_url}/api"
         self.models = []
         self.selected_model = None
+    
+    def update_base_url(self, base_url):
+        """Update the base URL and rebuild API URL"""
+        base_url = base_url.rstrip('/')
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]
+        self.base_url = base_url
+        self.api_url = f"{base_url}/api"
+        logging.info(f"Ollama base URL updated to: {base_url}")
 
     def check_installation(self):
         """
@@ -38,19 +62,76 @@ class OllamaHandler:
     def list_models(self):
         """
         List all available models in the Ollama service.
+        Uses HTTP API for remote servers, falls back to CLI for localhost.
         """
-        command = "ollama list"
+        # Use HTTP API for listing models (works for both local and remote)
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
-            if result.returncode == 0:
-                self.models = result.stdout.strip().splitlines()
-                return self.models
+            import httpx
+            # Get timeout from settings
+            try:
+                from webmind.settings import SettingsManager
+                timeout_settings = SettingsManager()
+                ollama_timeout = timeout_settings.get('ollama_timeout', 10.0)
+            except:
+                ollama_timeout = 10.0
+            
+            response = httpx.get(f'{self.api_url}/tags', timeout=ollama_timeout)
+            if response.status_code == 200:
+                data = response.json()
+                models = data.get('models', [])
+                if models:
+                    # Format similar to CLI output: header + model lines
+                    result = ['NAME\t\tID\t\tSIZE\t\tMODIFIED']
+                    for model in models:
+                        name = model.get('name', 'unknown')
+                        model_id = model.get('model', '')[:12] if model.get('model') else ''
+                        size = self._format_size(model.get('size', 0))
+                        modified = self._format_modified(model.get('modified_at', ''))
+                        result.append(f'{name}\t\t{model_id}\t\t{size}\t\t{modified}')
+                    self.models = result
+                    return self.models
+                else:
+                    self.models = ['NAME\t\tID\t\tSIZE\t\tMODIFIED']
+                    return self.models
             else:
-                logging.error(f"Ollama API error: {result.stderr}")
+                logging.error(f"Ollama API error: HTTP {response.status_code}")
                 return []
         except Exception as e:
-            logging.error(f"Ollama API error: {e}")
-            return []
+            logging.error(f"Ollama API error (HTTP): {e}")
+            # Fallback to CLI for localhost if HTTP fails
+            try:
+                command = "ollama list"
+                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                if result.returncode == 0:
+                    self.models = result.stdout.strip().splitlines()
+                    return self.models
+                else:
+                    logging.error(f"Ollama CLI error: {result.stderr}")
+                    return []
+            except Exception as cli_error:
+                logging.error(f"Ollama CLI error: {cli_error}")
+                return []
+    
+    def _format_size(self, size_bytes):
+        """Format bytes to human-readable size"""
+        if not size_bytes:
+            return '0 B'
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024.0:
+                return f'{size_bytes:.1f} {unit}'
+            size_bytes /= 1024.0
+        return f'{size_bytes:.1f} PB'
+    
+    def _format_modified(self, modified_str):
+        """Format modified timestamp"""
+        if not modified_str:
+            return ''
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(modified_str.replace('Z', '+00:00'))
+            return dt.strftime('%Y-%m-%d %H:%M')
+        except:
+            return modified_str[:16] if modified_str else ''
 
     async def generate_response_async(self, knowledge, model="llama3"):
         """

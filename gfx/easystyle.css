@@ -1,309 +1,1302 @@
-/* General Body Styles */
-body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-    background-image: url('/gfx/waves.png');
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    color: #1f2937;
+/* ============================================
+   MULTI-THEME HACKER UI - EasyAGI
+   Themes: Gruvbox, Everforest, Nord, Catppuccin Mocha
+   Resizable sidebar and chat input area
+   ============================================ */
+
+/* ========== THEME COLOR VARIABLES ========== */
+:root {
+    /* Default theme (Gruvbox) */
+    --theme-name: 'gruvbox';
+    
+    /* Background colors */
+    --bg-0: #282828;
+    --bg-1: #3c3836;
+    --bg-2: #504945;
+    --bg-light-0: #fbf1c7;
+    --bg-light-1: #ebdbb2;
+    --bg-light-2: #d5c4a1;
+    
+    /* Foreground colors */
+    --fg-0: #ebdbb2;
+    --fg-light-0: #3c3836;
+    --gray: #928374;
+    
+    /* Accent colors */
+    --accent-blue: #458588;
+    --accent-green: #98971a;
+    --accent-purple: #b16286;
+    --accent-red: #cc241d;
+    --accent-yellow: #d79921;
+    --accent-aqua: #689d6a;
+    --accent-orange: #d65d0e;
+    
+    /* Terminal colors */
+    --terminal-green: #689d6a;
+    --terminal-blue: #458588;
+}
+
+/* Everforest Theme */
+body[data-theme="everforest"] {
+    --theme-name: 'everforest';
+    --bg-0: #2d353b;
+    --bg-1: #343f44;
+    --bg-2: #3d484d;
+    --bg-light-0: #fdf6e3;
+    --bg-light-1: #efead4;
+    --bg-light-2: #dfd9c2;
+    --fg-0: #d3c6aa;
+    --fg-light-0: #5c6a72;
+    --gray: #859289;
+    --accent-blue: #7fbbb3;
+    --accent-green: #a7c080;
+    --accent-purple: #d699b6;
+    --accent-red: #e67e80;
+    --accent-yellow: #dbbc7f;
+    --accent-aqua: #83c092;
+    --accent-orange: #e69875;
+    --terminal-green: #a7c080;
+    --terminal-blue: #7fbbb3;
+}
+
+/* Nord Theme */
+body[data-theme="nord"] {
+    --theme-name: 'nord';
+    --bg-0: #2e3440;
+    --bg-1: #3b4252;
+    --bg-2: #434c5e;
+    --bg-light-0: #eceff4;
+    --bg-light-1: #e5e9f0;
+    --bg-light-2: #d8dee9;
+    --fg-0: #eceff4;
+    --fg-light-0: #3b4252;
+    --gray: #616e88;
+    --accent-blue: #5e81ac;
+    --accent-green: #a3be8c;
+    --accent-purple: #b48ead;
+    --accent-red: #bf616a;
+    --accent-yellow: #ebcb8b;
+    --accent-aqua: #8fbcbb;
+    --accent-orange: #d08770;
+    --terminal-green: #a3be8c;
+    --terminal-blue: #5e81ac;
+}
+
+/* Catppuccin Mocha Theme */
+body[data-theme="catppuccin"] {
+    --theme-name: 'catppuccin';
+    --bg-0: #1e1e2e;
+    --bg-1: #181825;
+    --bg-2: #313244;
+    --bg-light-0: #eff1f5;
+    --bg-light-1: #e6e9ef;
+    --bg-light-2: #dce0e8;
+    --fg-0: #cdd6f4;
+    --fg-light-0: #4c4f69;
+    --gray: #6c7086;
+    --accent-blue: #89b4fa;
+    --accent-green: #a6e3a1;
+    --accent-purple: #cba6f7;
+    --accent-red: #f38ba8;
+    --accent-yellow: #f9e2af;
+    --accent-aqua: #94e2d5;
+    --accent-orange: #fab387;
+    --terminal-green: #a6e3a1;
+    --terminal-blue: #89b4fa;
+}
+
+/* ========== BASE LAYOUT ========== */
+html, body, #q-app {
+    height: 100vh;
     margin: 0;
     padding: 0;
+    overflow-x: hidden; /* Prevent horizontal scrolling only */
+    overflow-y: hidden; /* Prevent vertical scrolling */
+    box-sizing: border-box;
+    position: relative; /* Ensure footer positioning works */
+}
+
+body {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
     line-height: 1.6;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+    overflow-y: hidden; /* Prevent vertical scrolling */
+    height: 100vh;
+    position: relative; /* Ensure footer positioning works */
 }
 
-# link style for link under chat input
-a:link, a:visited {
-    color: inherit !important;
-    text-decoration: none;
+/* ========== LIGHT MODE ========== */
+body {
+    background: var(--bg-light-0);
+    color: var(--fg-light-0);
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.02) 2px,
+            rgba(0, 0, 0, 0.02) 4px
+        );
+}
+
+/* ========== DARK MODE ========== */
+body.body--dark {
+    background: var(--bg-0);
+    color: var(--fg-0);
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 255, 255, 0.01) 2px,
+            rgba(255, 255, 255, 0.01) 4px
+        );
+}
+
+/* ========== HEADER (MINIMAL) ========== */
+.app-header {
+    background: var(--bg-1);
+    border-bottom: 2px solid var(--accent-blue);
+    padding: 0.75rem 1rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    min-height: 60px;
+}
+
+body.body--dark .app-header {
+    background: var(--bg-1);
+    border-bottom-color: var(--accent-blue);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+body .app-header {
+    background: var(--bg-light-1);
+    border-bottom-color: var(--accent-blue);
+}
+
+.nav-control-btn {
+    transition: all 0.2s ease;
+}
+
+.nav-control-btn:hover {
+    transform: scale(1.1);
+    color: var(--accent-green);
+}
+
+/* ========== SIDEBAR (RESIZABLE) ========== */
+.left-drawer {
+    background: var(--bg-1);
+    border-right: 2px solid var(--accent-blue);
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.4), inset -1px 0 0 rgba(69, 133, 136, 0.1);
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 200px;
+    max-width: 500px;
+    width: 260px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-blue) transparent;
+}
+
+/* Collapsible state */
+.left-drawer.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    transform: translateX(-100%);
+    border-right: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    display: none !important;
+}
+
+body.body--dark .left-drawer {
+    background: var(--bg-1);
+    border-right-color: var(--accent-blue);
+}
+
+body .left-drawer {
+    background: var(--bg-light-1);
+    border-right-color: var(--accent-blue);
+}
+
+/* Resize handle */
+.sidebar-resize-handle {
+    display: none !important; /* Disable manual resize */
+}
+
+.drawer-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    gap: 0.5rem;
+}
+
+/* Sidebar Title - Enhanced Header */
+.drawer-content > .text-xl,
+.left-drawer .q-row:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+    color: var(--accent-blue);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    padding: 1rem 1.25rem;
+    border-bottom: 2px solid var(--accent-blue);
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    text-shadow: 0 0 10px rgba(69, 133, 136, 0.6);
+    background: linear-gradient(135deg, transparent 0%, rgba(69, 133, 136, 0.05) 100%);
+    position: relative;
+}
+
+.drawer-content > .text-xl::after,
+.left-drawer .q-row:first-child::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 50px;
+    height: 2px;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px rgba(152, 151, 26, 0.6);
+}
+
+body.body--dark .drawer-content > .text-xl,
+body.body--dark .left-drawer .q-row:first-child {
+    color: var(--accent-blue);
+    text-shadow: 0 0 10px rgba(69, 133, 136, 0.9);
+    background: linear-gradient(135deg, transparent 0%, rgba(69, 133, 136, 0.1) 100%);
+}
+
+/* Sidebar Navigation Items - Enhanced with better spacing and visual hierarchy */
+.left-drawer .q-item,
+.drawer-nav-item {
+    margin: 0.25rem 0.75rem;
+    border-radius: 6px;
+    border-left: 4px solid transparent;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    padding: 0.85rem 1rem;
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+}
+
+.left-drawer .q-item::before,
+.drawer-nav-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent-blue);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.left-drawer .q-item:hover::before,
+.drawer-nav-item:hover::before {
+    opacity: 0.3;
+}
+
+.left-drawer .q-item:hover,
+.drawer-nav-item:hover {
+    background: var(--bg-2);
+    border-left-color: var(--accent-green);
+    transform: translateX(6px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 0 20px rgba(152, 151, 26, 0.1);
+    color: var(--accent-green);
+}
+
+body.body--dark .left-drawer .q-item:hover,
+body.body--dark .drawer-nav-item:hover {
+    background: var(--bg-2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(152, 151, 26, 0.15);
+}
+
+body .left-drawer .q-item:hover,
+body .drawer-nav-item:hover {
+    background: var(--bg-light-2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), inset 0 0 20px rgba(152, 151, 26, 0.08);
+}
+
+.left-drawer .q-item.bg-blue-200,
+.left-drawer .q-item.active,
+.drawer-nav-item.active {
+    background: linear-gradient(90deg, var(--bg-2) 0%, transparent 100%);
+    border-left-color: var(--accent-green);
+    color: var(--accent-green);
+    font-weight: 600;
+    box-shadow: inset 0 0 20px rgba(152, 151, 26, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateX(2px);
+}
+
+.left-drawer .q-item.active::before,
+.drawer-nav-item.active::before {
+    opacity: 1;
+    background: var(--accent-green);
+}
+
+body.body--dark .left-drawer .q-item.active,
+body.body--dark .drawer-nav-item.active {
+    background: linear-gradient(90deg, var(--bg-2) 0%, transparent 100%);
+    color: var(--accent-green);
+    box-shadow: inset 0 0 20px rgba(152, 151, 26, 0.3), 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+body .left-drawer .q-item.active,
+body .drawer-nav-item.active {
+    background: linear-gradient(90deg, var(--bg-light-2) 0%, transparent 100%);
+    color: var(--accent-green);
+    box-shadow: inset 0 0 20px rgba(152, 151, 26, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced icon styling in sidebar items */
+.left-drawer .q-item .q-icon,
+.drawer-nav-item .q-icon {
+    transition: all 0.25s ease;
+    font-size: 1.2rem;
+    margin-right: 0.75rem;
+    filter: drop-shadow(0 0 4px rgba(69, 133, 136, 0.3));
+}
+
+.left-drawer .q-item:hover .q-icon,
+.drawer-nav-item:hover .q-icon {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(152, 151, 26, 0.6));
+}
+
+.left-drawer .q-item.active .q-icon,
+.drawer-nav-item.active .q-icon {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 10px rgba(152, 151, 26, 0.8));
+}
+
+/* Label styling in sidebar items */
+.left-drawer .q-item .q-item__label,
+.drawer-nav-item .q-item__label {
     font-weight: 500;
+    letter-spacing: 0.5px;
+    transition: all 0.25s ease;
 }
 
-/* Header Styles */
-header {
-    background-color: transparent; /* Transparent background */
-    #color: white;
-    padding: 1rem;
-    text-align: center;
-    font-size: 1.5rem;
-    font-weight: 700;
+.left-drawer .q-item.active .q-item__label,
+.drawer-nav-item.active .q-item__label {
+    font-weight: 600;
+    letter-spacing: 0.75px;
 }
 
-# response window controls main from ui.tab_panels(tabs, value=chat_tab) from .classes('response-style')
+/* Sidebar Buttons - Enhanced */
+.left-drawer .q-btn {
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: none;
+    font-size: 0.9rem;
+    padding: 0.85rem 1rem;
+    margin: 0.25rem 0.75rem;
+    border-radius: 6px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    justify-content: flex-start;
+    text-align: left;
+    border-left: 4px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
 
-.response-style {
-    padding: 10px;
-    border-radius: 0px;
+.left-drawer .q-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent-blue);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.left-drawer .q-btn:hover {
+    background: var(--bg-2);
+    color: var(--accent-green);
+    transform: translateX(6px);
+    border-left-color: var(--accent-green);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 0 20px rgba(152, 151, 26, 0.1);
+}
+
+.left-drawer .q-btn:hover::before {
+    opacity: 0.3;
+}
+
+body.body--dark .left-drawer .q-btn:hover {
+    background: var(--bg-2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(152, 151, 26, 0.15);
+}
+
+body .left-drawer .q-btn:hover {
+    background: var(--bg-light-2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), inset 0 0 20px rgba(152, 151, 26, 0.08);
+}
+
+/* Sidebar Separator - Enhanced */
+.left-drawer .q-separator {
+    background: linear-gradient(90deg, transparent 0%, var(--accent-blue) 20%, var(--accent-blue) 80%, transparent 100%);
+    opacity: 0.4;
+    margin: 1.25rem 0.75rem;
+    height: 1px;
+    position: relative;
+}
+
+.left-drawer .q-separator::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 20px;
+    height: 1px;
+    background: var(--accent-green);
+    opacity: 0.6;
+    box-shadow: 0 0 4px rgba(152, 151, 26, 0.4);
+}
+
+.left-drawer .q-separator.q-mt-auto {
+    margin-top: auto;
+    margin-bottom: 0.5rem;
+}
+
+/* Theme Selector */
+.theme-selector {
+    padding: 0.5rem 1rem;
+    margin: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    background: var(--bg-2);
+    border: 2px solid var(--accent-blue);
+    border-radius: 6px;
+    color: var(--fg-0);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+body.body--dark .theme-selector {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+body .theme-selector {
+    background: var(--bg-light-2);
+    color: var(--fg-light-0);
+}
+
+.theme-selector:hover {
+    border-color: var(--accent-green);
+    transform: translateX(4px);
+}
+
+/* ========== PAGE CONTENT ========== */
+.page-content {
+    padding-top: 0; /* No extra space above chat area */
+    padding-right: 0; /* Remove right padding to fill to edge */
+    padding-bottom: 0; /* No bottom padding */
+    /* No padding-left here; we anchor with left boundary below */
+    box-sizing: border-box;
+    margin: 0; /* Remove centering to allow full dynamic width */
+    position: fixed; /* Anchor between header and footer */
+    top: 60px; /* Header height */
+    bottom: var(--footer-height, 160px); /* Footer height */
+    left: var(--sidebar-width, 280px); /* Anchor to dynamic sidebar width */
+    right: 0; /* Fill to right edge */
     display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 90%; /* Default to 90% width for centering */
-    max-width: 1200px;
-    margin: 0 auto;
-    flex-grow: 1;
-    flex-basis: 0;
-    border: 0px solid #218838;
-    background-color: rgba(255, 255, 255, 0.5); /* White background with 50% transparency */
+    flex-direction: column;
+    overflow: hidden; /* Parent doesn't scroll, child does */
+    min-height: 0; /* Important for flexbox children */
+    width: auto; /* Auto width based on left/right anchors */
 }
 
-/* Input Field Styles */
-.input {
-    padding: 10px;
-    border-radius: 5px;
+/* When sidebar is collapsed, expand content fully and clear footer offset */
+body.sidebar-collapsed .page-content {
+    left: 0 !important;
+}
+
+/* Settings page - no footer, so extend to bottom */
+.settings-page-content {
+    bottom: 0 !important; /* Extend to bottom since there's no footer */
+}
+
+body.sidebar-collapsed .terminal-footer {
+    padding-left: 1rem !important; /* Small left padding when collapsed */
+}
+/* Ensure Quasar layout containers don't reserve space when collapsed */
+body.sidebar-collapsed .q-layout,
+body.sidebar-collapsed .q-page-container,
+body.sidebar-collapsed .q-page,
+body.sidebar-collapsed #q-app {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+body.sidebar-collapsed .q-drawer-container {
+    width: 0 !important;
+    display: none !important;
+}
+
+/* Removed legacy env(sidebar-width) padding; width now controlled by left/right anchors */
+
+@media (max-width: 1023px) {
+    .page-content {
+        padding-top: 0;
+        /* On narrow screens, occupy full width with small padding */
+        left: 0;
+        right: 0;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-bottom: 0;
+    }
+}
+
+/* ========== CHAT CONTAINER ========== */
+.chat-container {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    gap: 0.5rem; /* Tighter spacing between messages */
+    padding: 0.5rem 0 0.5rem 1rem; /* Minimal padding - left only, no right padding */
+    overflow-y: auto !important; /* Force scrolling to work */
+    overflow-x: hidden;
+    flex: 1 1 0; /* Take all available space */
+    min-height: 0; /* Critical for flexbox scrolling */
+    max-height: 100%; /* Don't exceed parent */
+    margin-top: 0; /* Remove any top margin */
+    margin-bottom: 0;
+    margin-right: 0; /* No right margin */
+    width: 100%; /* Ensure full width */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    scroll-behavior: smooth; /* Smooth autoscroll to latest output */
+}
+
+/* Remove framework container padding that can add top/bottom gaps */
+.q-page-container { padding-top: 0 !important; padding-bottom: 0 !important; }
+.q-page { padding: 0 !important; }
+
+/* Message Block Format (name, separator, timestamp, content) */
+.message-block {
+    padding: 1rem 0;
+    margin-bottom: 1.5rem;
     width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    flex-grow: 1;
-    flex-basis: 0;
-    border: 2px solid #218838;
-    background-color: transparent;
-    color: #218838;
-    border-radius: 5px;
-    margin-left: 0.75rem; /* mx-3 */
-    background-color: #e6f4ea; /* bg-green-100 */
-    font-family: 'Courier New', Courier, monospace; /* input-class="font-mono" */
+    max-width: 100%; /* Ensure full width */
+    box-sizing: border-box; /* Include padding in width calculation */
+}
+
+.message-block * {
+    max-width: 100%; /* Ensure child elements don't exceed container */
+    box-sizing: border-box;
+}
+
+.message-block .text-lg {
+    margin-bottom: 0.5rem;
+    color: var(--accent-blue);
+}
+
+body.body--dark .message-block .text-lg {
+    color: var(--accent-blue);
+}
+
+.message-block .text-xs {
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+}
+
+.message-block .mt-2 {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* Ensure markdown content uses full width */
+.message-block .q-markdown,
+.message-block markdown,
+.message-block .markdown {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* Chat Messages */
+.chat-message {
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 3px solid var(--accent-blue);
+    background: var(--bg-light-1);
+    margin-bottom: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+body.body--dark .chat-message {
+    background: var(--bg-1);
+    border-left-color: var(--accent-blue);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.chat-message:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* NiceGUI Chat Message Components */
+.q-chat-message {
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s ease;
+}
+
+.q-chat-message--sent {
+    background: var(--bg-2);
+    border-left: 3px solid var(--accent-purple);
+    margin-left: auto;
+    max-width: 80%;
+}
+
+body.body--dark .q-chat-message--sent {
+    background: var(--bg-2);
+}
+
+body .q-chat-message--sent {
+    background: var(--bg-light-2);
+}
+
+.q-chat-message--received {
+    background: var(--bg-1);
+    border-left: 3px solid var(--accent-blue);
+    margin-right: auto;
+    max-width: 80%;
+}
+
+body.body--dark .q-chat-message--received {
+    background: var(--bg-1);
+}
+
+body .q-chat-message--received {
+    background: var(--bg-light-1);
+}
+
+.q-chat-message:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ========== TERMINAL FOOTER (RESIZABLE) ========== */
+.terminal-footer {
+    border-top: 2px solid var(--accent-blue);
+    background: var(--bg-1);
+    backdrop-filter: blur(10px);
+    padding: 1rem;
+    padding-left: 280px; /* Match drawer width */
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.3);
+    position: fixed !important; /* Ensure it's fixed */
+    bottom: 0 !important; /* Ensure it's at bottom */
+    left: 0;
+    right: 0;
+    z-index: 9999; /* Higher z-index to ensure visibility */
+    min-height: 120px; /* Taller input area */
+    max-height: 400px;
+    height: 160px; /* Default taller height */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    visibility: visible !important; /* Ensure it's visible */
+}
+
+body.body--dark .terminal-footer {
+    background: var(--bg-1);
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.5);
+}
+
+body .terminal-footer {
+    background: var(--bg-light-1);
+}
+
+/* Resize handle for footer */
+.footer-resize-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: transparent;
+    cursor: ns-resize;
+    z-index: 1000;
+    transition: background 0.2s ease;
+}
+
+.footer-resize-handle:hover {
+    background: var(--accent-blue);
+    opacity: 0.5;
+}
+
+.footer-resize-handle.active {
+    background: var(--accent-green);
+    opacity: 1;
+}
+
+@media (max-width: 1023px) {
+    .terminal-footer {
+        padding-left: 1rem;
+    }
+}
+
+.terminal-prefix {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--terminal-green);
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-shadow: 0 0 8px rgba(152, 151, 26, 0.6);
+    margin-right: 0.5rem;
+}
+
+body.body--dark .terminal-prefix {
+    color: var(--terminal-green);
+    text-shadow: 0 0 8px rgba(152, 151, 26, 0.8);
+}
+
+.prompt-input {
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--fg-0);
+    background: var(--bg-0);
+    border: 2px solid var(--accent-blue);
+    border-radius: 6px;
+    padding: 12px 16px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 0 rgba(69, 133, 136, 0);
+    min-height: 80px; /* Taller input */
+    flex: 1; /* Fill available space in footer */
+    resize: none; /* Prevent manual resize, footer handles it */
+}
+
+body.body--dark .prompt-input {
+    background: var(--bg-0);
+    color: var(--fg-0);
+    border-color: var(--accent-blue);
+}
+
+body .prompt-input {
+    background: var(--bg-light-0);
+    color: var(--fg-light-0);
+    border-color: var(--accent-blue);
+}
+
+.prompt-input:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 12px rgba(152, 151, 26, 0.4);
+    background: var(--bg-1);
+}
+
+body.body--dark .prompt-input:focus {
+    background: var(--bg-1);
+}
+
+body .prompt-input:focus {
+    background: var(--bg-light-1);
+}
+
+.send-btn {
+    color: var(--accent-green);
+    border: 2px solid var(--accent-green);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.send-btn:hover {
+    color: var(--bg-0);
+    background: var(--accent-green);
+    box-shadow: 0 0 12px rgba(152, 151, 26, 0.5);
+    transform: scale(1.05);
+}
+
+/* ========== INPUT FIELDS ========== */
+.input {
+    padding: 12px 16px;
+    border-radius: 6px;
+    width: 100%;
+    border: 2px solid var(--accent-blue);
+    background: var(--bg-light-1);
+    color: var(--fg-light-0);
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s ease;
+}
+
+body.body--dark .input {
+    background: var(--bg-1);
+    color: var(--fg-0);
+    border-color: var(--accent-blue);
 }
 
 .input:focus {
-    border-color: #34d058; /* Lighter green border */
-    color: #34d058; /* Lighter green text */
-    outline: none; /* Removes default focus outline */
+    border-color: var(--accent-green);
+    outline: none;
+    box-shadow: 0 0 8px rgba(152, 151, 26, 0.3);
+    background: var(--bg-light-0);
 }
 
+body.body--dark .input:focus {
+    background: var(--bg-0);
+}
 
-/* API Action Styles */
+/* ========== BUTTONS ========== */
 .api-action {
-    padding: 10px 15px;
+    padding: 12px 20px;
     font-size: 14px;
-    color: #ffffff;
-    background-color: #218838;
-    border: none;
-    border-radius: 3px;
-    transition: background-color 0.3s ease;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--fg-0);
+    background: var(--accent-blue);
+    border: 2px solid var(--accent-blue);
+    border-radius: 6px;
+    transition: all 0.2s ease;
     cursor: pointer;
     text-align: center;
     display: block;
     width: 100%;
     box-sizing: border-box;
-    text-decoration: none; /* Ensures no underline by default */
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+body.body--dark .api-action {
+    background: var(--accent-blue);
+    color: var(--fg-0);
 }
 
 .api-action:hover {
-    background-color: #1e7e34;
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(152, 151, 26, 0.4);
 }
 
 .api-action:active,
 .api-action:focus {
-    background-color: #1c7430;
-    color: #a4df90; /* Lighter green color for text */
-    outline: none; /* Removes default focus outline */
-    box-shadow: 0 0 0 2px #a4df90; /* Adds a lighter green outline for focus */
+    outline: none;
+    box-shadow: 0 0 12px rgba(152, 151, 26, 0.6);
 }
 
-/* Ensure the response field is visible and centered before input */
-.response-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 90%;
-    max-width: 1200px;
-    margin: 0 auto;
-    background-color: rgba(255, 255, 255, 0.666); /* White background with 66.6% transparency */
-}
-
-.footer {
-    padding: 10px;
-    border-radius: 0px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 90%;
-    max-width: 2xl;
-    margin: 0 auto;
-    flex-grow: 1;
-    flex-basis: 0;
-    border: 0px solid #218838;
-    background-color: rgba(255, 255, 255, 0.5); /* White background with 50% transparency */
-}
-
-# control style for interaction tabs of chat, logs, apik from .classes('tabs-style')
-
-.tab-style {
-    color: #218838; 
-    font-weight: bold; 
-    background-color: #e2e6ea; 
-    font-size: 16px; 
-    padding: 10px; 
-    border: 3px groove #218838; 
-    border-radius: 5px; 
-    transition: background-color 300ms ease-in-out, box-shadow 300ms ease-in-out;
-    margin-left: 0.5rem; /* ml-2 in Tailwind */
-    padding-top: 0.5rem; /* py-2 in Tailwind */
-    padding-bottom: 0.5rem; /* py-2 in Tailwind */
-    padding-left: 1rem; /* px-4 in Tailwind */
-    padding-right: 1rem; /* px-4 in Tailwind */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.666); /* shadow-md in Tailwind */
-}
-
-.tab-style:hover {
-    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); /* hover:shadow-lg in Tailwind */
-}
-
-.tab-style:active {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* active:shadow-sm in Tailwind */
-}
-
-
-
-# darkmode button row style
-.darkrow {
-    color: #ADD8E6;
-    background-color: #1C3D5A;
-    font-weight: bold;
-    font-size: 16px;
-    width: 150px;
-    padding: 10px;
-    border: 2px solid #1C3D5A;
-    border-radius: 5px;
-    transition: background-color 200ms ease-in-out, box-shadow 200ms ease-in-out;
-    margin-left: 0.5rem; /* ml-2 equivalent in Tailwind CSS */
-    padding-top: 0.5rem; /* py-2 equivalent in Tailwind CSS */
-    padding-bottom: 0.5rem; /* py-2 equivalent in Tailwind CSS */
-    padding-left: 1rem; /* px-4 equivalent in Tailwind CSS */
-    padding-right: 1rem; /* px-4 equivalent in Tailwind CSS */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md equivalent in Tailwind CSS */
-}
-
-.darkrow:hover {
-    background-color: #1B2E40; /* hover:bg-blue-900 equivalent in Tailwind CSS */
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-md equivalent in Tailwind CSS */
-}
-
-.darkrow:active {
-    background-color: #1E3A61; /* active:bg-blue-700 equivalent in Tailwind CSS */
-    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06); /* shadow-sm equivalent in Tailwind CSS */
-}
-
-/* Dark mode version */
-@media (prefers-color-scheme: dark) {
-    .darkrow {
-        color: #90C3D4;
-        background-color: #122637;
-        border: 2px solid #122637;
-    }
-
-    .darkrow:hover {
-        background-color: #0F1E2A; /* Adjusted for dark mode */
-    }
-
-    .darkrow:active {
-        background-color: #13273C; /* Adjusted for dark mode */
-    }
-}
-
-
-# Default (light mode) styles for .logbuttons
 .logbuttons {
-    color: #ADD8E6; /* Light blue text color */
-    font-weight: bold; /* Bold text */
-    background-color: #1C3D5A; /* Dark blue background color */
-    font-size: 16px; /* Font size set to 16 pixels */
-    width: 150px; /* Fixed width of 150 pixels */
-    padding: 10px; /* Padding of 10 pixels on all sides */
-    border: 2px solid #1C3D5A; /* Dark blue solid border with 2px width */
-    border-radius: 5px; /* Rounded corners with 5px radius */
-    display: flex; /* Enables flexbox layout */
-    justify-content: center; /* Centers content horizontally */
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+    font-size: 14px;
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--accent-blue);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    background: var(--bg-light-1);
+    color: var(--accent-blue);
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
 }
 
-# Dark mode styles for .logbuttons
-
-@media (prefers-color-scheme: dark) {
-    .logbuttons {
-        color: #90C3D4; /* Slightly darker blue text color */
-        background-color: #122637; /* Even darker background color */
-        border: 2px solid #122637; /* Border color matches dark mode background */
-    }
+body.body--dark .logbuttons {
+    background: var(--bg-1);
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
 }
 
+.logbuttons:hover {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    color: var(--bg-0);
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(152, 151, 26, 0.4);
+}
 
+/* ========== CARDS ========== */
+.q-card {
+    background: var(--bg-light-1);
+    border: 2px solid var(--accent-blue);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
 
-@media (min-width: 768px) and (max-width: 991.98px) {
-    .main-content, .nicegui-content {
-        padding: 2rem;
-        margin: 2rem auto;
-        width: 90%;
+body.body--dark .q-card {
+    background: var(--bg-1);
+    border-color: var(--accent-blue);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.q-card:hover {
+    border-color: var(--accent-green);
+    box-shadow: 0 6px 16px rgba(152, 151, 26, 0.2);
+}
+
+/* ========== SWITCHES & TOGGLES ========== */
+.q-switch {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ========== LINKS ========== */
+a:link, a:visited {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--accent-green);
+    text-shadow: 0 0 4px rgba(152, 151, 26, 0.5);
+}
+
+.footer-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--gray);
+    margin-top: 0.5rem;
+}
+
+body.body--dark .footer-link {
+    color: var(--gray);
+}
+
+/* ========== RESPONSE STYLE ========== */
+.response-style {
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 3px solid var(--accent-purple);
+    background: var(--bg-light-1);
+    margin: 1rem 0;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+body.body--dark .response-style {
+    background: var(--bg-1);
+    border-left-color: var(--accent-purple);
+}
+
+/* ========== NAVIGATION BUTTONS ========== */
+.nav-button {
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.nav-button.active {
+    color: var(--accent-green);
+    border-bottom: 2px solid var(--accent-green);
+}
+
+/* ========== FAB BUTTONS ========== */
+.q-fab {
+    background: var(--accent-blue);
+    color: var(--fg-0);
+    box-shadow: 0 4px 12px rgba(69, 133, 136, 0.4);
+    transition: all 0.2s ease;
+    border: 2px solid var(--accent-blue);
+}
+
+body.body--dark .q-fab {
+    background: var(--accent-blue);
+    color: var(--fg-0);
+}
+
+body .q-fab {
+    background: var(--accent-blue);
+    color: var(--fg-0);
+}
+
+.q-fab:hover {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    box-shadow: 0 6px 16px rgba(152, 151, 26, 0.5);
+    transform: scale(1.1);
+}
+
+/* ========== MENU STYLES ========== */
+.q-menu {
+    background: var(--bg-1);
+    border: 2px solid var(--accent-blue);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    font-family: 'JetBrains Mono', monospace;
+    z-index: 10001 !important; /* Ensure over terminal-footer (9999) */
+}
+
+body.body--dark .q-menu {
+    background: var(--bg-1);
+}
+
+body .q-menu {
+    background: var(--bg-light-1);
+}
+
+.q-menu-item {
+    padding: 12px 16px;
+    color: var(--fg-0);
+    transition: all 0.2s ease;
+}
+
+.q-menu-item:hover {
+    background: var(--bg-2);
+    color: var(--accent-green);
+}
+
+body .q-menu-item:hover {
+    background: var(--bg-light-2);
+}
+
+/* ========== SEPARATORS ========== */
+.q-separator {
+    background: var(--accent-blue);
+    opacity: 0.3;
+}
+
+/* ========== MARKDOWN CONTENT ========== */
+.markdown-content {
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.8;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+.markdown-content code {
+    background: var(--bg-2);
+    color: var(--accent-green);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+body.body--dark .markdown-content code {
+    background: var(--bg-2);
+}
+
+body .markdown-content code {
+    background: var(--bg-light-2);
+}
+
+.markdown-content pre {
+    background: var(--bg-1);
+    border: 1px solid var(--accent-blue);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+body.body--dark .markdown-content pre {
+    background: var(--bg-1);
+}
+
+body .markdown-content pre {
+    background: var(--bg-light-1);
+}
+
+/* Sidebar-specific scrollbar styling */
+.left-drawer::-webkit-scrollbar {
+    width: 6px;
+}
+
+.left-drawer::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.left-drawer::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 3px;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+}
+
+.left-drawer::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-green);
+    opacity: 0.8;
+}
+
+/* Footer link hover effect */
+.left-drawer a {
+    transition: all 0.2s ease;
+}
+
+.left-drawer a:hover {
+    color: var(--accent-green) !important;
+    text-shadow: 0 0 6px rgba(152, 151, 26, 0.6);
+}
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-0);
+}
+
+body.body--dark ::-webkit-scrollbar-track {
+    background: var(--bg-0);
+}
+
+body ::-webkit-scrollbar-track {
+    background: var(--bg-light-0);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-green);
+}
+
+/* ========== ANIMATIONS ========== */
+@keyframes glitch {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+}
+
+.terminal-prefix::before {
+    content: '>';
+    animation: glitch 0.3s infinite;
+}
+
+/* ========== TOAST NOTIFICATIONS ========== */
+/* Reposition toasts to top-right, away from input area */
+.q-notifications {
+    top: 80px !important;
+    right: 20px !important;
+    bottom: auto !important;
+    z-index: 10000;
+}
+
+.q-notification {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 280px;
+    max-width: 400px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+/* Toast by type - themed */
+.q-notification--positive {
+    background: var(--bg-2);
+    border-left-color: var(--accent-green);
+    color: var(--fg-0);
+}
+
+body.body--dark .q-notification--positive {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+body .q-notification--positive {
+    background: var(--bg-light-2);
+    color: var(--fg-light-0);
+}
+
+.q-notification--negative {
+    background: var(--bg-2);
+    border-left-color: var(--accent-red);
+    color: var(--fg-0);
+}
+
+body.body--dark .q-notification--negative {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+body .q-notification--negative {
+    background: var(--bg-light-2);
+    color: var(--fg-light-0);
+}
+
+.q-notification--warning {
+    background: var(--bg-2);
+    border-left-color: var(--accent-yellow);
+    color: var(--fg-0);
+}
+
+body.body--dark .q-notification--warning {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+body .q-notification--warning {
+    background: var(--bg-light-2);
+    color: var(--fg-light-0);
+}
+
+.q-notification--info {
+    background: var(--bg-2);
+    border-left-color: var(--accent-blue);
+    color: var(--fg-0);
+}
+
+body.body--dark .q-notification--info {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+body .q-notification--info {
+    background: var(--bg-light-2);
+    color: var(--fg-light-0);
+}
+
+.q-notification:hover {
+    transform: translateX(-4px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+    .page-content {
+        padding-top: 0;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        padding-bottom: 0;
     }
 
-    header {
-        font-size: 1.45rem;
-    }
-
-    .button {
-        padding: 0.75rem 1.5rem;
-    }
-
-    .response-container {
+    .terminal-footer {
         padding: 1rem;
-        margin: 1rem auto;
-        width: 90%;
     }
 
-    .response-text {
-        font-size: 1rem;
-    }
-}
-
-@media (min-width: 992px) and (max-width: 1199.98px) {
-    .main-content, .nicegui-content {
-        padding: 2rem;
-        margin: 2rem auto;
-        width: 85%;
+    .app-header {
+        padding: 0.5rem;
     }
 
-    header {
-        font-size: 1.5rem;
+    .chat-container {
+        padding: 0.5rem 0.5rem 0.5rem 0;
+        max-height: 100%;
     }
 
-    .button {
-        padding: 0.75rem 1.5rem;
-    }
-
-    .response-container {
-        padding: 1rem;
-        margin: 1rem auto;
-        width: 85%;
-    }
-
-    .response-text {
-        font-size: 1rem;
-    }
-}
-
-@media (min-width: 1200px) {
-    .main-content, .nicegui-content {
-        padding: 2rem;
-        margin: 2rem auto;
-        width: 80%;
-    }
-
-    header {
-        font-size: 1.5rem;
-    }
-
-    .button {
-        padding: 0.75rem 1.5rem;
-    }
-
-    .response-container {
-        padding: 1rem;
-        margin: 1rem auto;
-        width: 80%;
-    }
-
-    .response-text {
-        font-size: 1rem;
+    .q-notifications {
+        top: 60px !important;
+        right: 10px !important;
     }
 }
